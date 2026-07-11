@@ -43,6 +43,23 @@ function ta_register_post_types() {
         'show_in_rest' => true,
     ]);
 
+    // Register chapter meta for REST API
+    register_post_meta('chapter', '_story_id', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('chapter', '_chapter_number', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('chapter', '_audio_url', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('chapter', '_is_vip', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('chapter', '_vip_price', ['show_in_rest' => true, 'type' => 'string']);
+
+    // Register story meta for REST API
+    register_post_meta('truyen', '_views', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('truyen', '_rating', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('truyen', '_rating_count', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('truyen', '_chapter_count', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('truyen', '_status', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('truyen', '_dao_linh_thach', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('truyen', '_free_chapters', ['show_in_rest' => true, 'type' => 'string']);
+    register_post_meta('truyen', '_dao_price', ['show_in_rest' => true, 'type' => 'string']);
+
     register_taxonomy('the_loai', 'truyen', [
         'labels' => [
             'name' => 'Thể loại',
@@ -1146,7 +1163,220 @@ add_action('rest_api_init', function () {
         'callback' => 'ta_rest_purchase_vip',
         'permission_callback' => 'is_user_logged_in',
     ]);
+
+    // Chapters by story ID — returns meta data directly
+    register_rest_route('truyenaudio/v1', '/stories/(?P<id>\d+)/chapters', [
+        'methods' => 'GET',
+        'callback' => 'ta_rest_get_chapters',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // Stories with meta
+    register_rest_route('truyenaudio/v1', '/stories/(?P<id>\d+)', [
+        'methods' => 'GET',
+        'callback' => 'ta_rest_get_story',
+        'permission_callback' => '__return_true',
+    ]);
+
+    // Create chapter (author only)
+    register_rest_route('truyenaudio/v1', '/chapters', [
+        'methods' => 'POST',
+        'callback' => 'ta_rest_create_chapter',
+        'permission_callback' => 'is_user_logged_in',
+    ]);
+
+    // Delete chapter
+    register_rest_route('truyenaudio/v1', '/chapters/(?P<id>\d+)', [
+        'methods' => 'DELETE',
+        'callback' => 'ta_rest_delete_chapter',
+        'permission_callback' => 'is_user_logged_in',
+    ]);
+
+    // Create story (author only)
+    register_rest_route('truyenaudio/v1', '/stories', [
+        'methods' => 'POST',
+        'callback' => 'ta_rest_create_story',
+        'permission_callback' => 'is_user_logged_in',
+    ]);
+
+    // Update story
+    register_rest_route('truyenaudio/v1', '/stories/(?P<id>\d+)', [
+        'methods' => 'PUT',
+        'callback' => 'ta_rest_update_story',
+        'permission_callback' => 'is_user_logged_in',
+    ]);
+
+    // Delete story
+    register_rest_route('truyenaudio/v1', '/stories/(?P<id>\d+)', [
+        'methods' => 'DELETE',
+        'callback' => 'ta_rest_delete_story',
+        'permission_callback' => 'is_user_logged_in',
+    ]);
 });
+
+function ta_rest_get_chapters($request) {
+    $story_id = intval($request['id']);
+    $chapters = ta_get_chapters($story_id);
+    $data = [];
+    foreach ($chapters as $ch) {
+        $data[] = [
+            'id' => $ch->ID,
+            'title' => $ch->post_title,
+            'content' => apply_filters('the_content', $ch->post_content),
+            'meta' => [
+                '_story_id' => get_post_meta($ch->ID, '_story_id', true),
+                '_chapter_number' => get_post_meta($ch->ID, '_chapter_number', true),
+                '_audio_url' => get_post_meta($ch->ID, '_audio_url', true),
+                '_is_vip' => get_post_meta($ch->ID, '_is_vip', true),
+                '_vip_price' => get_post_meta($ch->ID, '_vip_price', true),
+            ],
+        ];
+    }
+    return new WP_REST_Response($data);
+}
+
+function ta_rest_get_story($request) {
+    $id = intval($request['id']);
+    $post = get_post($id);
+    if (!$post || $post->post_type !== 'truyen') {
+        return new WP_Error('not_found', 'Không tìm thấy truyện', ['status' => 404]);
+    }
+    $thumbnail = '';
+    if (has_post_thumbnail($id)) {
+        $thumb = wp_get_attachment_image_src(get_post_thumbnail_id($id), 'medium');
+        if ($thumb) $thumbnail = $thumb[0];
+    }
+    $terms = wp_get_post_terms($id, ['the_loai', 'tac_gia', 'trang_thai']);
+    $genres = [];
+    $authors = [];
+    foreach ($terms as $t) {
+        if ($t->taxonomy === 'the_loai') $genres[] = $t->name;
+        if ($t->taxonomy === 'tac_gia') $authors[] = $t->name;
+    }
+    $chapters = ta_get_chapters($id);
+    return new WP_REST_Response([
+        'id' => $id,
+        'title' => ['rendered' => $post->post_title],
+        'excerpt' => ['rendered' => wp_strip_all_tags($post->post_excerpt)],
+        'content' => ['rendered' => apply_filters('the_content', $post->post_content)],
+        'thumbnail' => $thumbnail,
+        'genres' => $genres,
+        'authors' => $authors,
+        'chapter_count' => count($chapters),
+        'meta' => [
+            '_views' => get_post_meta($id, '_views', true) ?: 0,
+            '_rating' => floatval(get_post_meta($id, '_rating', true) ?: 0),
+            '_rating_count' => intval(get_post_meta($id, '_rating_count', true) ?: 0),
+            '_chapter_count' => count($chapters),
+        ],
+    ]);
+}
+
+function ta_rest_create_chapter($request) {
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+        return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
+    }
+    $title = sanitize_text_field($request->get_param('title'));
+    $content = wp_kses_post($request->get_param('content'));
+    $story_id = intval($request->get_param('story_id'));
+    $chapter_number = intval($request->get_param('chapter_number'));
+    $audio_url = esc_url_raw($request->get_param('audio_url') ?? '');
+    $is_vip = $request->get_param('is_vip') ? '1' : '0';
+
+    if (empty($title) || !$story_id) {
+        return new WP_Error('missing', 'Thiếu tiêu đề hoặc story_id', ['status' => 400]);
+    }
+
+    $post_id = wp_insert_post([
+        'post_title' => $title,
+        'post_content' => $content,
+        'post_type' => 'chapter',
+        'post_status' => 'publish',
+        'post_author' => $user_id,
+    ]);
+    if (is_wp_error($post_id)) return $post_id;
+
+    update_post_meta($post_id, '_story_id', $story_id);
+    update_post_meta($post_id, '_chapter_number', $chapter_number);
+    update_post_meta($post_id, '_audio_url', $audio_url);
+    update_post_meta($post_id, '_is_vip', $is_vip);
+
+    return new WP_REST_Response(['id' => $post_id, 'message' => 'Tạo chương thành công'], 201);
+}
+
+function ta_rest_delete_chapter($request) {
+    $id = intval($request['id']);
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+        return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
+    }
+    wp_delete_post($id, true);
+    return new WP_REST_Response(['message' => 'Đã xóa chương']);
+}
+
+function ta_rest_create_story($request) {
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+        return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
+    }
+    $title = sanitize_text_field($request->get_param('title'));
+    $content = wp_kses_post($request->get_param('content'));
+    $excerpt = sanitize_textarea_field($request->get_param('excerpt') ?? '');
+    if (empty($title)) {
+        return new WP_Error('missing', 'Thiếu tiêu đề', ['status' => 400]);
+    }
+    $post_id = wp_insert_post([
+        'post_title' => $title,
+        'post_content' => $content,
+        'post_excerpt' => $excerpt,
+        'post_type' => 'truyen',
+        'post_status' => 'draft',
+        'post_author' => $user_id,
+    ]);
+    if (is_wp_error($post_id)) return $post_id;
+
+    update_post_meta($post_id, '_views', 0);
+    update_post_meta($post_id, '_rating', 0);
+    update_post_meta($post_id, '_rating_count', 0);
+    update_post_meta($post_id, '_chapter_count', 0);
+
+    $genre_ids = $request->get_param('genre_ids');
+    if (is_array($genre_ids)) {
+        wp_set_post_terms($post_id, array_map('intval', $genre_ids), 'the_loai');
+    }
+
+    return new WP_REST_Response(['id' => $post_id, 'message' => 'Tạo truyện thành công'], 201);
+}
+
+function ta_rest_update_story($request) {
+    $id = intval($request['id']);
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+        return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
+    }
+    $update = ['ID' => $id];
+    if ($request->get_param('title')) $update['post_title'] = sanitize_text_field($request->get_param('title'));
+    if ($request->get_param('content') !== null) $update['post_content'] = wp_kses_post($request->get_param('content'));
+    if ($request->get_param('status')) $update['post_status'] = sanitize_text_field($request->get_param('status'));
+    wp_update_post($update);
+    return new WP_REST_Response(['message' => 'Cập nhật thành công']);
+}
+
+function ta_rest_delete_story($request) {
+    $id = intval($request['id']);
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+        return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
+    }
+    wp_delete_post($id, true);
+    return new WP_REST_Response(['message' => 'Đã xóa truyện']);
+}
 
 function ta_register_user($request) {
     $username = sanitize_user($request->get_param('username'));
@@ -2017,3 +2247,11 @@ register_activation_hook(__FILE__, function() {
     }
     flush_rewrite_rules();
 });
+
+// Expose roles to authenticated user via REST API
+add_filter('wp_rest_prepare_user', function($response, $user, $request) {
+    if (get_current_user_id() === $user->ID || current_user_can('list_users')) {
+        $response->data['roles'] = $user->roles;
+    }
+    return $response;
+}, 10, 3);

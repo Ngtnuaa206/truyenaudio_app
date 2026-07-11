@@ -40,6 +40,14 @@ class Story {
 
     List<String> getTerms(String taxonomy) {
       try {
+        // Custom API returns flat lists
+        if (json['genres'] != null && taxonomy == 'the_loai') {
+          return (json['genres'] as List).map<String>((t) => t.toString()).toList();
+        }
+        if (json['authors'] != null && taxonomy == 'tac_gia') {
+          return (json['authors'] as List).map<String>((t) => t.toString()).toList();
+        }
+        // WP embedded terms
         return (json['_embedded']?['wp:term'] as List?)
             ?.expand((l) => l as List)
             ?.where((t) => t['taxonomy'] == taxonomy)
@@ -48,16 +56,29 @@ class Story {
       } catch (_) { return []; }
     }
 
+    // Custom API returns 'thumbnail' directly
+    String thumb = '';
+    if (json['thumbnail'] != null && json['thumbnail'].toString().isNotEmpty) {
+      thumb = json['thumbnail'].toString();
+    } else if (json['_embedded']?['wp:featuredmedia'] != null) {
+      thumb = json['_embedded']?['wp:featuredmedia']?[0]?['source_url'] ?? '';
+    }
+
+    int chapterCount = getMetaInt('_chapter_count');
+    if (chapterCount == 0 && json['chapter_count'] != null) {
+      chapterCount = int.tryParse(json['chapter_count'].toString()) ?? 0;
+    }
+
     return Story(
       id: json['id'] ?? 0,
       title: json['title']?['rendered'] ?? json['title']?.toString() ?? '',
       excerpt: (json['excerpt']?['rendered'] ?? '').replaceAll(RegExp(r'<[^>]*>'), ''),
       content: json['content']?['rendered'] ?? '',
-      thumbnail: json['_embedded']?['wp:featuredmedia']?[0]?['source_url'] ?? '',
+      thumbnail: thumb,
       views: getMetaInt('_views'),
       rating: getMetaDouble('_rating'),
       ratingCount: getMetaInt('_rating_count'),
-      chapterCount: getMetaInt('_chapter_count'),
+      chapterCount: chapterCount,
       status: getMeta('_status'),
       genres: getTerms('the_loai'),
       authors: getTerms('tac_gia'),

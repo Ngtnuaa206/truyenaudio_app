@@ -6,27 +6,43 @@ import '../models/chapter.dart';
 
 class ApiService {
   static const String baseUrl = 'http://192.168.1.17/wordpress/wp-json/wp/v2';
+  static const String customUrl = 'http://192.168.1.17/wordpress/wp-json/truyenaudio/v1';
   static const String siteUrl = 'http://192.168.1.17/wordpress';
 
-  Future<List<Story>> getStories({
-    int page = 1,
-    int perPage = 20,
-    String? genre,
-    String? author,
-    String? status,
-    String orderBy = 'date',
-  }) async {
-    final params = {
+  Future<String?> _token() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('token');
+  }
+
+  Map<String, String> _authHeaders(String? token) {
+    final h = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) h['Authorization'] = 'Bearer $token';
+    return h;
+  }
+
+  Future<List<Story>> getStories({int page = 1, int perPage = 20, String? genre, String orderBy = 'date'}) async {
+    final params = <String, String>{
       'page': page.toString(),
       'per_page': perPage.toString(),
       '_embed': 'wp:featuredmedia,wp:term',
       'orderby': orderBy == 'views' ? 'meta_value_num' : orderBy,
     };
     if (orderBy == 'views') params['meta_key'] = '_views';
+    if (genre != null && genre.isNotEmpty) params['the_loai'] = genre;
 
     final uri = Uri.parse('$baseUrl/truyen').replace(queryParameters: params);
     final res = await http.get(uri);
+    if (res.statusCode == 200) {
+      final List data = jsonDecode(res.body);
+      return data.map((e) => Story.fromJson(e)).toList();
+    }
+    return [];
+  }
 
+  Future<List<Story>> searchStories(String query) async {
+    final params = {'search': query, 'per_page': '20', '_embed': 'wp:featuredmedia,wp:term'};
+    final uri = Uri.parse('$baseUrl/truyen').replace(queryParameters: params);
+    final res = await http.get(uri);
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       return data.map((e) => Story.fromJson(e)).toList();
@@ -35,7 +51,7 @@ class ApiService {
   }
 
   Future<Story?> getStory(int id) async {
-    final res = await http.get(Uri.parse('$baseUrl/truyen/$id?_embed=wp:featuredmedia,wp:term'));
+    final res = await http.get(Uri.parse('$customUrl/stories/$id'));
     if (res.statusCode == 200) {
       return Story.fromJson(jsonDecode(res.body));
     }
@@ -43,19 +59,19 @@ class ApiService {
   }
 
   Future<List<Chapter>> getChapters(int storyId) async {
-    final res = await http.get(Uri.parse('$baseUrl/chapter?meta_key=_story_id&meta_value=$storyId&orderby=meta_value_num&order=asc&meta_key=_chapter_number&per_page=100'));
+    final res = await http.get(Uri.parse('$customUrl/stories/$storyId/chapters'));
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
-      return data.map((e) => Chapter.fromJson(e)).toList();
+      final chapters = data.map((e) => Chapter.fromJson(e)).toList();
+      chapters.sort((a, b) => a.chapterNumber.compareTo(b.chapterNumber));
+      return chapters;
     }
     return [];
   }
 
   Future<Chapter?> getChapter(int id) async {
     final res = await http.get(Uri.parse('$baseUrl/chapter/$id'));
-    if (res.statusCode == 200) {
-      return Chapter.fromJson(jsonDecode(res.body));
-    }
+    if (res.statusCode == 200) return Chapter.fromJson(jsonDecode(res.body));
     return null;
   }
 
@@ -79,9 +95,7 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getGenres() async {
     final res = await http.get(Uri.parse('$baseUrl/the_loai?per_page=50'));
-    if (res.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(jsonDecode(res.body));
-    }
+    if (res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body));
     return [];
   }
 
@@ -96,6 +110,19 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', data['token']);
       await prefs.setString('username', data['user_display_name'] ?? username);
+
+      final userRes = await http.get(
+        Uri.parse('$siteUrl/wp-json/wp/v2/users/me'),
+        headers: {'Authorization': 'Bearer ${data["token"]}'},
+      );
+      if (userRes.statusCode == 200) {
+        final userData = jsonDecode(userRes.body);
+        final roles = (userData['roles'] as List?)?.cast<String>() ?? [];
+        String role = 'subscriber';
+        if (roles.contains('administrator')) role = 'administrator';
+        else if (roles.contains('tac_gia_role')) role = 'tac_gia_role';
+        await prefs.setString('user_role', role);
+      }
       return data;
     }
     return null;
@@ -105,32 +132,16 @@ class ApiService {
     final res = await http.post(
       Uri.parse('$siteUrl/wp-json/wp/v2/users/register'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'username': username,
-        'email': email,
-        'password': password,
-      }),
+      body: jsonEncode({'username': username, 'email': email, 'password': password}),
     );
     return res.statusCode == 200 || res.statusCode == 201;
-  }
-
-  Future<Map<String, dynamic>?> getUser() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    if (token == null) return null;
-
-    final res = await http.get(
-      Uri.parse('$siteUrl/wp-json/wp/v2/users/me'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (res.statusCode == 200) return jsonDecode(res.body);
-    return null;
   }
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     await prefs.remove('username');
+    await prefs.remove('user_role');
   }
 
   Future<bool> isLoggedIn() async {
@@ -141,5 +152,222 @@ class ApiService {
   Future<String?> getUsername() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('username');
+  }
+
+  Future<String?> getUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_role');
+  }
+
+  Future<bool> isAuthor() async {
+    final role = await getUserRole();
+    return role == 'tac_gia_role' || role == 'administrator';
+  }
+
+  Future<bool> submitRating(int postId, int rating) async {
+    final token = await _token();
+    final res = await http.post(
+      Uri.parse('$baseUrl/rate_story'),
+      headers: _authHeaders(token),
+      body: jsonEncode({'post_id': postId, 'rating': rating}),
+    );
+    return res.statusCode == 200;
+  }
+
+  Future<bool?> toggleBookmark(int postId) async {
+    final token = await _token();
+    if (token == null) return null;
+    final res = await http.post(
+      Uri.parse('$baseUrl/toggle_bookmark'),
+      headers: _authHeaders(token),
+      body: jsonEncode({'post_id': postId}),
+    );
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      return data['status'] == 'added';
+    }
+    return null;
+  }
+
+  Future<void> saveHistory(int storyId, int chapterId) async {
+    final token = await _token();
+    if (token == null) return;
+    await http.post(
+      Uri.parse('$baseUrl/save_history'),
+      headers: _authHeaders(token),
+      body: jsonEncode({'story_id': storyId, 'chapter_id': chapterId}),
+    );
+  }
+
+  Future<List<Story>> getBookmarks() async {
+    final token = await _token();
+    if (token == null) return [];
+    final res = await http.get(
+      Uri.parse('$baseUrl/truyen?_embed=wp:featuredmedia,wp:term&per_page=50'),
+      headers: _authHeaders(token),
+    );
+    if (res.statusCode == 200) {
+      final List data = jsonDecode(res.body);
+      return data.map((e) => Story.fromJson(e)).toList();
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> getHistory() async {
+    final token = await _token();
+    if (token == null) return [];
+    final res = await http.get(Uri.parse('$baseUrl/save_history'), headers: _authHeaders(token));
+    if (res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+    return [];
+  }
+
+  // ====== AUTHOR FEATURES ======
+
+  Future<Map<String, dynamic>?> getAuthorStats() async {
+    final token = await _token();
+    if (token == null) return null;
+    final res = await http.get(
+      Uri.parse('$siteUrl/wp-json/truyenaudio/v1/author-stats'),
+      headers: _authHeaders(token),
+    );
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    return null;
+  }
+
+  Future<bool> upgradeToAuthor() async {
+    final token = await _token();
+    if (token == null) return false;
+    final res = await http.post(
+      Uri.parse('$siteUrl/wp-json/truyenaudio/v1/upgrade-author'),
+      headers: _authHeaders(token),
+    );
+    if (res.statusCode == 200) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_role', 'tac_gia_role');
+      return true;
+    }
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> getAuthorStories() async {
+    final token = await _token();
+    if (token == null) return [];
+    final res = await http.get(
+      Uri.parse('$baseUrl/truyen?_embed=wp:featuredmedia,wp:term&per_page=50&author=me'),
+      headers: _authHeaders(token),
+    );
+    if (res.statusCode == 200) {
+      final List data = jsonDecode(res.body);
+      return data.map((e) => {
+        'id': e['id'],
+        'title': e['title']?['rendered'] ?? '',
+        'views': e['meta']?['_views'] ?? 0,
+        'rating': e['meta']?['_rating'] ?? 0,
+        'status': e['status'] ?? 'draft',
+      }).toList();
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> createStory({
+    required String title,
+    required String content,
+    required String excerpt,
+    List<int>? genreIds,
+  }) async {
+    final token = await _token();
+    if (token == null) return null;
+    final res = await http.post(
+      Uri.parse('$customUrl/stories'),
+      headers: _authHeaders(token),
+      body: jsonEncode({
+        'title': title,
+        'content': content,
+        'excerpt': excerpt,
+        'genre_ids': genreIds,
+      }),
+    );
+    if (res.statusCode == 200 || res.statusCode == 201) return jsonDecode(res.body);
+    return null;
+  }
+
+  Future<bool> updateStory(int storyId, {String? title, String? content, String? excerpt, String? status}) async {
+    final token = await _token();
+    if (token == null) return false;
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (content != null) body['content'] = content;
+    if (excerpt != null) body['excerpt'] = excerpt;
+    if (status != null) body['status'] = status;
+    final res = await http.put(
+      Uri.parse('$customUrl/stories/$storyId'),
+      headers: _authHeaders(token),
+      body: jsonEncode(body),
+    );
+    return res.statusCode == 200;
+  }
+
+  Future<bool> deleteStory(int storyId) async {
+    final token = await _token();
+    if (token == null) return false;
+    final res = await http.delete(
+      Uri.parse('$customUrl/stories/$storyId'),
+      headers: _authHeaders(token),
+    );
+    return res.statusCode == 200;
+  }
+
+  Future<Map<String, dynamic>?> createChapter({
+    required int storyId,
+    required String title,
+    required String content,
+    required int chapterNumber,
+    String audioUrl = '',
+    bool isVip = false,
+  }) async {
+    final token = await _token();
+    if (token == null) return null;
+    final res = await http.post(
+      Uri.parse('$customUrl/chapters'),
+      headers: _authHeaders(token),
+      body: jsonEncode({
+        'title': title,
+        'content': content,
+        'story_id': storyId,
+        'chapter_number': chapterNumber,
+        'audio_url': audioUrl,
+        'is_vip': isVip,
+      }),
+    );
+    if (res.statusCode == 200 || res.statusCode == 201) return jsonDecode(res.body);
+    return null;
+  }
+
+  Future<bool> deleteChapter(int chapterId) async {
+    final token = await _token();
+    if (token == null) return false;
+    final res = await http.delete(
+      Uri.parse('$customUrl/chapters/$chapterId'),
+      headers: _authHeaders(token),
+    );
+    return res.statusCode == 200;
+  }
+
+  Future<List<Map<String, dynamic>>> getMyStories() async {
+    final token = await _token();
+    if (token == null) return [];
+    final res = await http.get(
+      Uri.parse('$baseUrl/truyen?per_page=50'),
+      headers: _authHeaders(token),
+    );
+    if (res.statusCode == 200) {
+      final List data = jsonDecode(res.body);
+      return data.map<Map<String, dynamic>>((e) => {
+        'id': e['id'],
+        'title': e['title']?['rendered'] ?? '',
+        'status': e['status'] ?? '',
+      }).toList();
+    }
+    return [];
   }
 }
