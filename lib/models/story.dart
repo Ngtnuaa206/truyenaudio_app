@@ -10,7 +10,6 @@ class Story {
   final int chapterCount;
   final String status;
   final List<String> genres;
-  final List<String> authors;
 
   Story({
     required this.id,
@@ -24,7 +23,6 @@ class Story {
     this.chapterCount = 0,
     this.status = '',
     this.genres = const [],
-    this.authors = const [],
   });
 
   factory Story.fromJson(Map<String, dynamic> json) {
@@ -40,14 +38,9 @@ class Story {
 
     List<String> getTerms(String taxonomy) {
       try {
-        // Custom API returns flat lists
         if (json['genres'] != null && taxonomy == 'the_loai') {
           return (json['genres'] as List).map<String>((t) => t.toString()).toList();
         }
-        if (json['authors'] != null && taxonomy == 'tac_gia') {
-          return (json['authors'] as List).map<String>((t) => t.toString()).toList();
-        }
-        // WP embedded terms
         return (json['_embedded']?['wp:term'] as List?)
             ?.expand((l) => l as List)
             ?.where((t) => t['taxonomy'] == taxonomy)
@@ -81,7 +74,6 @@ class Story {
       chapterCount: chapterCount,
       status: getMeta('_status'),
       genres: getTerms('the_loai'),
-      authors: getTerms('tac_gia'),
     );
   }
 }

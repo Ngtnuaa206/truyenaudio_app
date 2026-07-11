@@ -150,14 +150,6 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                 if (_story!.genres.isNotEmpty)
                   Wrap(spacing: 6, runSpacing: 4,
                     children: _story!.genres.map((g) => _tag(g, accent)).toList()),
-                if (_story!.authors.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    Icon(Icons.person_outline, size: 14, color: subColor),
-                    const SizedBox(width: 4),
-                    Text(_story!.authors.join(', '), style: TextStyle(color: subColor, fontSize: 12)),
-                  ]),
-                ],
                 const SizedBox(height: 8),
                 Row(children: [
                   Icon(Icons.menu_book, size: 14, color: subColor),

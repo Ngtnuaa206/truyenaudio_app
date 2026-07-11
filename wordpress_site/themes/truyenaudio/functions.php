@@ -188,7 +188,7 @@ function ta_save_pending_genres($genres) {
     update_option('_ta_pending_genres', $genres);
 }
 
-// Xử lý khi tác giả gửi thể loại mới (gọi từ page-tac-gia-dashboard.php)
+// Xử lý khi gửi thể loại mới
 function ta_submit_new_genre($genre_name, $user_id) {
     $genre_name = sanitize_text_field(trim($genre_name));
     if (empty($genre_name)) return false;
@@ -281,7 +281,7 @@ function ta_reject_genre($index, $reason = '') {
         $reason_text = $reason ? "\nLý do: {$reason}" : '';
         wp_mail($user->user_email, "[{$site_name}] Thể loại bị từ chối", "Chào {$user->display_name},\n\nThể loại \"{$genre_name}\" đã bị admin từ chối.{$reason_text}\n\nBạn có thể thử lại với tên thể loại khác.\n\nTrân trọng,\n{$site_name}");
         if (function_exists('ta_add_notification')) {
-            ta_add_notification($genre['user_id'], 'error', '❌ Thể loại "' . $genre_name . '" đã bị từ chối.' . ($reason ? ' Lý do: ' . $reason : ''), home_url('/tac-gia-dashboard'));
+            ta_add_notification($genre['user_id'], 'error', '❌ Thể loại "' . $genre_name . '" đã bị từ chối.' . ($reason ? ' Lý do: ' . $reason : ''), home_url('/profile'));
         }
     }
 

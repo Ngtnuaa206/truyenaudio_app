@@ -5,7 +5,6 @@ $user = wp_get_current_user();
 $lt = get_user_meta($user->ID, '_linh_thach', true) ?: 0;
 $bookmarks = get_user_meta($user->ID, '_bookmarks', true) ?: [];
 $history = get_user_meta($user->ID, '_reading_history', true) ?: [];
-$is_author = in_array('tac_gia_role', (array) $user->roles);
 $is_admin = in_array('administrator', (array) $user->roles);
 ?>
 
@@ -18,12 +17,6 @@ $is_admin = in_array('administrator', (array) $user->roles);
         </div>
         <p style="margin-top:15px;color:#888;font-size:14px;">Email: <?php echo $user->user_email; ?></p>
         <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
-            <?php if ($is_author || $is_admin): ?>
-                <a href="<?php echo home_url('/tac-gia-dashboard'); ?>" class="btn btn-outline">📊 Dashboard tác giả</a>
-                <a href="<?php echo home_url('/truyen-cua-toi'); ?>" class="btn btn-outline">📚 Truyện của tôi</a>
-            <?php else: ?>
-                <a href="<?php echo home_url('/dang-ky-tac-gia'); ?>" class="btn btn-primary">✍️ Đăng ký tác giả</a>
-            <?php endif; ?>
             <a href="<?php echo home_url('/theo-doi'); ?>" class="btn btn-outline">📚 Truyện theo dõi (<?php echo count($bookmarks); ?>)</a>
             <a href="<?php echo home_url('/lich-su'); ?>" class="btn btn-outline">📖 Lịch sử đọc</a>
             <a href="<?php echo home_url('/linh-thach'); ?>" class="btn btn-outline">💎 Nạp Linh Thạch</a>

@@ -36,13 +36,6 @@
                     <span class="btn btn-sm btn-primary"><?php echo esc_html($user->display_name); ?></span>
                     <div class="dropdown-menu">
                         <a href="<?php echo home_url('/profile'); ?>">Thông tin cá nhân</a>
-                        <?php if (in_array('tac_gia_role', (array) $user->roles) || in_array('administrator', (array) $user->roles)): ?>
-                            <a href="<?php echo home_url('/tac-gia-dashboard'); ?>">📊 Dashboard tác giả</a>
-                            <a href="<?php echo home_url('/truyen-cua-toi'); ?>">📚 Truyện của tôi</a>
-                            <a href="<?php echo home_url('/rut-linh-thach'); ?>">💎 Rút Linh Thạch</a>
-                        <?php else: ?>
-                            <a href="<?php echo home_url('/dang-ky-tac-gia'); ?>">✍️ Đăng ký tác giả</a>
-                        <?php endif; ?>
                         <a href="<?php echo home_url('/theo-doi'); ?>">Truyện theo dõi</a>
                         <a href="<?php echo home_url('/lich-su'); ?>">Lịch sử đọc</a>
                         <?php if (current_user_can('edit_posts')): ?>

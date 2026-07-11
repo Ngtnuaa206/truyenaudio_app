@@ -71,17 +71,6 @@ function ta_register_post_types() {
         'show_in_rest' => true,
     ]);
 
-    register_taxonomy('tac_gia', 'truyen', [
-        'labels' => [
-            'name' => 'Tác giả',
-            'singular_name' => 'Tác giả',
-            'add_new_item' => 'Thêm tác giả mới',
-        ],
-        'hierarchical' => false,
-        'rewrite' => ['slug' => 'tac-gia'],
-        'show_in_rest' => true,
-    ]);
-
     register_taxonomy('trang_thai', 'truyen', [
         'labels' => [
             'name' => 'Trạng thái',
@@ -276,17 +265,6 @@ function ta_ajax_report_story() {
     wp_send_json_success(['message' => '✅ Báo cáo đã được gửi! Admin sẽ xem xét sớm nhất.']);
 }
 
-// ==================== Add role: Author (Tác giả) ====================
-function ta_add_roles() {
-    add_role('tac_gia_role', 'Tác giả', [
-        'read' => true,
-        'edit_posts' => true,
-        'publish_posts' => true,
-        'delete_posts' => true,
-        'upload_files' => true,
-    ]);
-}
-
 // ==================== CHAPTER META ====================
 add_action('add_meta_boxes', 'ta_add_chapter_meta');
 function ta_add_chapter_meta() {
@@ -350,7 +328,6 @@ function ta_save_chapter_meta($post_id) {
 add_action('add_meta_boxes', 'ta_add_story_meta');
 function ta_add_story_meta() {
     add_meta_box('story_details', 'Chi tiết truyện', 'ta_story_meta_html', 'truyen', 'side');
-    add_meta_box('story_author_box', 'Tác giả (bút danh)', 'ta_story_author_meta_html', 'truyen', 'side');
     add_meta_box('story_dao_box', 'Cài đặt Đào Linh Thạch', 'ta_story_dao_meta_html', 'truyen', 'side');
 }
 
@@ -372,20 +349,6 @@ function ta_story_meta_html($post) {
     <p>
         <label>Doanh thu (💎):</label>
         <input type="number" name="story_revenue" value="<?php echo $revenue; ?>" style="width:100%" min="0">
-    </p>
-    <?php
-}
-
-function ta_story_author_meta_html($post) {
-    $author_user_id = $post->post_author;
-    $pen_name = get_post_meta($post->ID, '_pen_name', true);
-    $user = get_userdata($author_user_id);
-    ?>
-    <p><label>Người đăng (WP User):</label> <strong><?php echo $user ? $user->display_name . ' (' . $user->user_login . ')' : 'N/A'; ?></strong></p>
-    <p>
-        <label>Bút danh hiển thị:</label>
-        <input type="text" name="pen_name" value="<?php echo esc_attr($pen_name); ?>" style="width:100%" placeholder="Nhập bút danh">
-        <small style="color:#888;">Sẽ tự động thêm vào taxonomy Tác giả</small>
     </p>
     <?php
 }
@@ -427,16 +390,6 @@ function ta_save_story_meta($post_id) {
     if (isset($_POST['dao_linh_thach'])) update_post_meta($post_id, '_dao_linh_thach', '1'); else update_post_meta($post_id, '_dao_linh_thach', '0');
     if (isset($_POST['free_chapters'])) update_post_meta($post_id, '_free_chapters', intval($_POST['free_chapters']));
     if (isset($_POST['dao_price'])) update_post_meta($post_id, '_dao_price', intval($_POST['dao_price']));
-
-    if (isset($_POST['pen_name']) && !empty($_POST['pen_name'])) {
-        $pen_name = sanitize_text_field($_POST['pen_name']);
-        update_post_meta($post_id, '_pen_name', $pen_name);
-        $term = term_exists($pen_name, 'tac_gia');
-        if (!$term) $term = wp_insert_term($pen_name, 'tac_gia');
-        if (!is_wp_error($term)) {
-            wp_set_post_terms($post_id, [intval($term['term_id'])], 'tac_gia', true);
-        }
-    }
 }
 
 function ta_can_read_chapter($chapter_id, $story_id = null) {
@@ -628,131 +581,6 @@ function ta_purchase_vip_chapter() {
         'new_balance' => $new_lt,
         'profit' => $author_profit,
     ]);
-}
-
-// ==================== UPGRADE USER TO AUTHOR ====================
-add_action('wp_ajax_ta_upgrade_to_author', 'ta_upgrade_to_author');
-add_action('wp_ajax_nopriv_ta_upgrade_to_author', 'ta_upgrade_to_author');
-function ta_upgrade_to_author() {
-    $user_id = get_current_user_id();
-    if (!$user_id) wp_send_json_error('Vui lòng đăng nhập');
-
-    $user = get_userdata($user_id);
-    if (in_array('tac_gia_role', (array) $user->roles)) {
-        wp_send_json_error('Bạn đã là tác giả rồi');
-    }
-    if (in_array('administrator', (array) $user->roles)) {
-        wp_send_json_error('Admin không cần nâng cấp');
-    }
-
-    $user->set_role('tac_gia_role');
-    ta_set_flash('success', '✍️ Chúc mừng! Bạn đã trở thành tác giả. Hãy đăng truyện ngay!');
-    wp_send_json_success(['message' => 'Chúc mừng! Bạn đã trở thành tác giả.']);
-}
-
-// ==================== WITHDRAWAL SYSTEM ====================
-add_action('wp_ajax_ta_request_withdrawal', 'ta_request_withdrawal');
-function ta_request_withdrawal() {
-    $user_id = get_current_user_id();
-    if (!$user_id) wp_send_json_error('Vui lòng đăng nhập');
-
-    $amount = floatval($_POST['amount']);
-    $method = sanitize_text_field($_POST['method']);
-    $account_info = sanitize_text_field($_POST['account_info']);
-    $fee_pct = get_option('ta_withdrawal_fee', 3);
-    $fee = floor($amount * $fee_pct / 100);
-    $net = $amount - $fee;
-
-    $min_wd = get_option('ta_min_withdrawal', 10000);
-    if ($amount < $min_wd) wp_send_json_error('Số lượng rút tối thiểu là ' . number_format($min_wd) . ' Linh Thạch');
-    if (empty($method)) wp_send_json_error('Chọn phương thức rút tiền');
-    if (empty($account_info)) wp_send_json_error('Nhập thông tin tài khoản');
-
-    $balance = get_user_meta($user_id, '_linh_thach', true) ?: 0;
-    $withdrawn = get_user_meta($user_id, '_author_withdrawn', true) ?: 0;
-    $available = $balance - $withdrawn;
-
-    if ($amount > $available) {
-        wp_send_json_error('Bạn chỉ có thể rút tối đa ' . number_format($available) . ' Linh Thạch');
-    }
-
-    $requests = get_user_meta($user_id, '_withdrawal_requests', true) ?: [];
-    $requests[] = [
-        'amount' => $amount,
-        'fee_pct' => $fee_pct,
-        'fee' => $fee,
-        'net' => $net,
-        'method' => $method,
-        'account_info' => $account_info,
-        'status' => 'pending',
-        'time' => current_time('mysql'),
-    ];
-    update_user_meta($user_id, '_withdrawal_requests', $requests);
-
-    // Log history
-    $history = get_user_meta($user_id, '_lt_history', true) ?: [];
-    $history[] = [
-        'type' => 'withdrawal_request',
-        'amount' => -$amount,
-        'fee' => $fee,
-        'net' => $net,
-        'method' => $method,
-        'note' => 'Yêu cầu rút ' . number_format($amount) . ' LT (phí ' . $fee_pct . '%, thực nhận ' . number_format($net) . ' LT)',
-        'time' => current_time('mysql'),
-    ];
-    update_user_meta($user_id, '_lt_history', $history);
-
-    ta_set_flash('success', '✅ Yêu cầu rút ' . number_format($amount) . ' Linh Thạch đã được gửi. Admin sẽ xử lý sớm nhất!');
-    wp_send_json_success(['message' => 'Yêu cầu rút tiền đã được gửi (phí ' . $fee_pct . '%, thực nhận ' . number_format($net) . ' LT).']);
-}
-
-// Admin approval: show withdrawal requests in user profile
-add_action('show_user_profile', 'ta_show_withdrawal_requests');
-add_action('edit_user_profile', 'ta_show_withdrawal_requests');
-function ta_show_withdrawal_requests($user) {
-    if (!current_user_can('administrator')) return;
-    $requests = get_user_meta($user->ID, '_withdrawal_requests', true) ?: [];
-    if (empty($requests)) return;
-    ?>
-    <h3>Yêu cầu rút tiền</h3>
-    <table class="form-table">
-        <tr>
-            <th>Thời gian</th>
-            <th>Số lượng</th>
-            <th>Phí</th>
-            <th>Thực nhận</th>
-            <th>Phương thức</th>
-            <th>Thông tin</th>
-            <th>Trạng thái</th>
-            <th>Hành động</th>
-        </tr>
-        <?php foreach ($requests as $i => $r): ?>
-        <tr>
-            <td><?php echo $r['time']; ?></td>
-            <td><?php echo number_format($r['amount']); ?> LT</td>
-            <td><?php echo isset($r['fee']) ? number_format($r['fee']) . ' LT (' . $r['fee_pct'] . '%)' : '—'; ?></td>
-            <td><?php echo isset($r['net']) ? number_format($r['net']) . ' LT' : '—'; ?></td>
-            <td><?php echo $r['method']; ?></td>
-            <td><?php echo esc_html($r['account_info']); ?></td>
-            <td>
-                <?php if ($r['status'] == 'pending'): ?>
-                    <span style="color:#f39c12;">Chờ duyệt</span>
-                <?php elseif ($r['status'] == 'approved'): ?>
-                    <span style="color:#2ecc71;">Đã duyệt</span>
-                <?php else: ?>
-                    <span style="color:#e74c3c;">Từ chối</span>
-                <?php endif; ?>
-            </td>
-            <td>
-                <?php if ($r['status'] == 'pending'): ?>
-                    <button type="button" class="button button-primary" onclick="window.location.href='<?php echo admin_url('admin-ajax.php?action=ta_approve_withdrawal&user_id=' . $user->ID . '&index=' . $i . '&_wpnonce=' . wp_create_nonce('ta_withdrawal_nonce')); ?>'">Duyệt</button>
-                    <button type="button" class="button" onclick="window.location.href='<?php echo admin_url('admin-ajax.php?action=ta_reject_withdrawal&user_id=' . $user->ID . '&index=' . $i . '&_wpnonce=' . wp_create_nonce('ta_withdrawal_nonce')); ?>'">Từ chối</button>
-                <?php endif; ?>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-    </table>
-    <?php
 }
 
 // ==================== SOCIAL LOGIN (OAUTH) ====================
@@ -1153,18 +981,8 @@ add_action('rest_api_init', function () {
         'callback' => 'ta_rest_upgrade_author',
         'permission_callback' => 'is_user_logged_in',
     ]);
-    register_rest_route('truyenaudio/v1', '/author-stats', [
-        'methods' => 'GET',
-        'callback' => 'ta_rest_author_stats',
-        'permission_callback' => 'is_user_logged_in',
-    ]);
-    register_rest_route('truyenaudio/v1', '/purchase-vip', [
-        'methods' => 'POST',
-        'callback' => 'ta_rest_purchase_vip',
-        'permission_callback' => 'is_user_logged_in',
-    ]);
 
-    // Chapters by story ID — returns meta data directly
+    // Chapters by story ID
     register_rest_route('truyenaudio/v1', '/stories/(?P<id>\d+)/chapters', [
         'methods' => 'GET',
         'callback' => 'ta_rest_get_chapters',
@@ -1275,7 +1093,7 @@ function ta_rest_get_story($request) {
 function ta_rest_create_chapter($request) {
     $user_id = get_current_user_id();
     $user = get_userdata($user_id);
-    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+    if (!current_user_can('administrator')) {
         return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
     }
     $title = sanitize_text_field($request->get_param('title'));
@@ -1309,8 +1127,7 @@ function ta_rest_create_chapter($request) {
 function ta_rest_delete_chapter($request) {
     $id = intval($request['id']);
     $user_id = get_current_user_id();
-    $user = get_userdata($user_id);
-    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+    if (!current_user_can('administrator')) {
         return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
     }
     wp_delete_post($id, true);
@@ -1319,8 +1136,7 @@ function ta_rest_delete_chapter($request) {
 
 function ta_rest_create_story($request) {
     $user_id = get_current_user_id();
-    $user = get_userdata($user_id);
-    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+    if (!current_user_can('administrator')) {
         return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
     }
     $title = sanitize_text_field($request->get_param('title'));
@@ -1355,8 +1171,7 @@ function ta_rest_create_story($request) {
 function ta_rest_update_story($request) {
     $id = intval($request['id']);
     $user_id = get_current_user_id();
-    $user = get_userdata($user_id);
-    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+    if (!current_user_can('administrator')) {
         return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
     }
     $update = ['ID' => $id];
@@ -1370,8 +1185,7 @@ function ta_rest_update_story($request) {
 function ta_rest_delete_story($request) {
     $id = intval($request['id']);
     $user_id = get_current_user_id();
-    $user = get_userdata($user_id);
-    if (!in_array('tac_gia_role', (array) $user->roles) && !current_user_can('administrator')) {
+    if (!current_user_can('administrator')) {
         return new WP_Error('forbidden', 'Bạn không có quyền', ['status' => 403]);
     }
     wp_delete_post($id, true);
@@ -1405,73 +1219,6 @@ function ta_register_user($request) {
     }
 
     return new WP_REST_Response(['message' => 'Đăng ký thành công', 'user_id' => $user_id], 201);
-}
-
-function ta_rest_upgrade_author() {
-    $user_id = get_current_user_id();
-    $user = get_userdata($user_id);
-
-    if (in_array('tac_gia_role', (array) $user->roles)) {
-        return new WP_Error('already_author', 'Bạn đã là tác giả', ['status' => 400]);
-    }
-    if (in_array('administrator', (array) $user->roles)) {
-        return new WP_Error('is_admin', 'Admin không cần nâng cấp', ['status' => 400]);
-    }
-
-    $user->set_role('tac_gia_role');
-    ta_set_flash('success', '✍️ Chúc mừng bạn đã trở thành tác giả!');
-    return new WP_REST_Response(['message' => 'Chúc mừng bạn đã trở thành tác giả!', 'role' => 'tac_gia_role']);
-}
-
-function ta_rest_author_stats() {
-    $user_id = get_current_user_id();
-    if (!in_array('tac_gia_role', (array) get_userdata($user_id)->roles) && !current_user_can('administrator')) {
-        return new WP_Error('not_author', 'Bạn không phải tác giả', ['status' => 403]);
-    }
-
-    $stories = get_posts([
-        'post_type' => 'truyen',
-        'author' => $user_id,
-        'numberposts' => -1,
-    ]);
-
-    $total_views = 0;
-    $total_revenue = 0;
-    $total_chapters = 0;
-    $story_data = [];
-
-    foreach ($stories as $s) {
-        $views = get_post_meta($s->ID, '_views', true) ?: 0;
-        $revenue = get_post_meta($s->ID, '_story_revenue', true) ?: 0;
-        $chapters = ta_get_chapters($s->ID);
-        $total_views += $views;
-        $total_revenue += $revenue;
-        $total_chapters += count($chapters);
-        $story_data[] = [
-            'id' => $s->ID,
-            'title' => $s->post_title,
-            'views' => $views,
-            'revenue' => $revenue,
-            'chapters' => count($chapters),
-            'url' => get_permalink($s->ID),
-        ];
-    }
-
-    $balance = get_user_meta($user_id, '_linh_thach', true) ?: 0;
-    $earnings = get_user_meta($user_id, '_author_earnings', true) ?: 0;
-    $withdrawn = get_user_meta($user_id, '_author_withdrawn', true) ?: 0;
-
-    return new WP_REST_Response([
-        'stories' => count($stories),
-        'total_views' => $total_views,
-        'total_revenue' => $total_revenue,
-        'total_chapters' => $total_chapters,
-        'balance' => $balance,
-        'earnings' => $earnings,
-        'withdrawn' => $withdrawn,
-        'available' => $balance - $withdrawn,
-        'story_list' => $story_data,
-    ]);
 }
 
 function ta_rest_purchase_vip($request) {
@@ -1547,8 +1294,7 @@ function ta_user_role_badge($user_id = null) {
     if (!$user_id) return '';
     $user = get_userdata($user_id);
     if (in_array('administrator', (array) $user->roles)) return '<span class="role-badge admin">Admin</span>';
-    if (in_array('tac_gia_role', (array) $user->roles)) return '<span class="role-badge author">Tác giả</span>';
-    return '<span class="role-badge user">User</span>';
+    return '<span class="role-badge user">Đọc giả</span>';
 }
 
 // ==================== 403 ACCESS DENIED ====================
@@ -1583,22 +1329,6 @@ function ta_require_role($roles) {
     ta_require_auth();
     $user = wp_get_current_user();
     if (!array_intersect((array)$roles, (array)$user->roles)) ta_deny();
-}
-
-// ==================== BLOCK AUTHOR FROM WP ADMIN ====================
-add_action('admin_init', 'ta_block_admin_from_author');
-function ta_block_admin_from_author() {
-    if (defined('DOING_AJAX') && DOING_AJAX) return;
-    if (!is_user_logged_in()) return;
-    $user = wp_get_current_user();
-    if (in_array('tac_gia_role', (array) $user->roles)) {
-        // Allow post editing pages (post.php, post-new.php)
-        global $pagenow;
-        $allowed = ['post.php', 'post-new.php', 'admin-ajax.php', 'upload.php', 'media-new.php', 'async-upload.php'];
-        if (in_array($pagenow, $allowed)) return;
-        wp_redirect(home_url('/tac-gia-dashboard'));
-        exit;
-    }
 }
 
 add_action('wp_logout', 'ta_redirect_after_logout');

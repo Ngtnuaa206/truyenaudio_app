@@ -7,7 +7,6 @@ import 'login_screen.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
 import 'genre_stories_screen.dart';
-import 'author_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -27,7 +26,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _loading = true;
   bool _loggedIn = false;
   String? _username;
-  String? _userRole;
   String? _selectedGenreId;
 
   @override
@@ -44,7 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _api.getGenres(),
       _api.isLoggedIn(),
       _api.getUsername(),
-      _api.getUserRole(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -54,7 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _genres = results[3] as List<Map<String, dynamic>>;
       _loggedIn = results[4] as bool;
       _username = results[5] as String?;
-      _userRole = results[6] as String?;
       _loading = false;
     });
   }
@@ -104,11 +100,9 @@ class _HomeScreenState extends State<HomeScreen> {
               onSelected: (v) async {
                 if (v == 'logout') {
                   await _api.logout();
-                  if (mounted) setState(() { _loggedIn = false; _userRole = null; });
+                  if (mounted) setState(() { _loggedIn = false; });
                 } else if (v == 'profile') {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
-                } else if (v == 'author') {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AuthorScreen()));
                 }
               },
               itemBuilder: (_) => [
@@ -117,15 +111,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 10),
                   Text('Hồ sơ', style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
                 ])),
-                PopupMenuItem(
-                  value: 'author',
-                  child: Row(children: [
-                    Icon(Icons.edit_note, size: 18, color: isDark ? Colors.white70 : Colors.black54),
-                    const SizedBox(width: 10),
-                    Text((_userRole == 'tac_gia_role' || _userRole == 'administrator') ? 'Bảng tác giả' : 'Trở thành tác giả',
-                        style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                  ]),
-                ),
                 const PopupMenuItem(value: 'logout', child: Row(children: [
                   Icon(Icons.logout, size: 18, color: Colors.red),
                   SizedBox(width: 10),

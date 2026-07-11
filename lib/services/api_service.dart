@@ -120,7 +120,6 @@ class ApiService {
         final roles = (userData['roles'] as List?)?.cast<String>() ?? [];
         String role = 'subscriber';
         if (roles.contains('administrator')) role = 'administrator';
-        else if (roles.contains('tac_gia_role')) role = 'tac_gia_role';
         await prefs.setString('user_role', role);
       }
       return data;
@@ -159,9 +158,9 @@ class ApiService {
     return prefs.getString('user_role');
   }
 
-  Future<bool> isAuthor() async {
+  Future<bool> isAdmin() async {
     final role = await getUserRole();
-    return role == 'tac_gia_role' || role == 'administrator';
+    return role == 'administrator';
   }
 
   Future<bool> submitRating(int postId, int rating) async {
@@ -218,156 +217,6 @@ class ApiService {
     if (token == null) return [];
     final res = await http.get(Uri.parse('$baseUrl/save_history'), headers: _authHeaders(token));
     if (res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body));
-    return [];
-  }
-
-  // ====== AUTHOR FEATURES ======
-
-  Future<Map<String, dynamic>?> getAuthorStats() async {
-    final token = await _token();
-    if (token == null) return null;
-    final res = await http.get(
-      Uri.parse('$siteUrl/wp-json/truyenaudio/v1/author-stats'),
-      headers: _authHeaders(token),
-    );
-    if (res.statusCode == 200) return jsonDecode(res.body);
-    return null;
-  }
-
-  Future<bool> upgradeToAuthor() async {
-    final token = await _token();
-    if (token == null) return false;
-    final res = await http.post(
-      Uri.parse('$siteUrl/wp-json/truyenaudio/v1/upgrade-author'),
-      headers: _authHeaders(token),
-    );
-    if (res.statusCode == 200) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_role', 'tac_gia_role');
-      return true;
-    }
-    return false;
-  }
-
-  Future<List<Map<String, dynamic>>> getAuthorStories() async {
-    final token = await _token();
-    if (token == null) return [];
-    final res = await http.get(
-      Uri.parse('$baseUrl/truyen?_embed=wp:featuredmedia,wp:term&per_page=50&author=me'),
-      headers: _authHeaders(token),
-    );
-    if (res.statusCode == 200) {
-      final List data = jsonDecode(res.body);
-      return data.map((e) => {
-        'id': e['id'],
-        'title': e['title']?['rendered'] ?? '',
-        'views': e['meta']?['_views'] ?? 0,
-        'rating': e['meta']?['_rating'] ?? 0,
-        'status': e['status'] ?? 'draft',
-      }).toList();
-    }
-    return [];
-  }
-
-  Future<Map<String, dynamic>?> createStory({
-    required String title,
-    required String content,
-    required String excerpt,
-    List<int>? genreIds,
-  }) async {
-    final token = await _token();
-    if (token == null) return null;
-    final res = await http.post(
-      Uri.parse('$customUrl/stories'),
-      headers: _authHeaders(token),
-      body: jsonEncode({
-        'title': title,
-        'content': content,
-        'excerpt': excerpt,
-        'genre_ids': genreIds,
-      }),
-    );
-    if (res.statusCode == 200 || res.statusCode == 201) return jsonDecode(res.body);
-    return null;
-  }
-
-  Future<bool> updateStory(int storyId, {String? title, String? content, String? excerpt, String? status}) async {
-    final token = await _token();
-    if (token == null) return false;
-    final body = <String, dynamic>{};
-    if (title != null) body['title'] = title;
-    if (content != null) body['content'] = content;
-    if (excerpt != null) body['excerpt'] = excerpt;
-    if (status != null) body['status'] = status;
-    final res = await http.put(
-      Uri.parse('$customUrl/stories/$storyId'),
-      headers: _authHeaders(token),
-      body: jsonEncode(body),
-    );
-    return res.statusCode == 200;
-  }
-
-  Future<bool> deleteStory(int storyId) async {
-    final token = await _token();
-    if (token == null) return false;
-    final res = await http.delete(
-      Uri.parse('$customUrl/stories/$storyId'),
-      headers: _authHeaders(token),
-    );
-    return res.statusCode == 200;
-  }
-
-  Future<Map<String, dynamic>?> createChapter({
-    required int storyId,
-    required String title,
-    required String content,
-    required int chapterNumber,
-    String audioUrl = '',
-    bool isVip = false,
-  }) async {
-    final token = await _token();
-    if (token == null) return null;
-    final res = await http.post(
-      Uri.parse('$customUrl/chapters'),
-      headers: _authHeaders(token),
-      body: jsonEncode({
-        'title': title,
-        'content': content,
-        'story_id': storyId,
-        'chapter_number': chapterNumber,
-        'audio_url': audioUrl,
-        'is_vip': isVip,
-      }),
-    );
-    if (res.statusCode == 200 || res.statusCode == 201) return jsonDecode(res.body);
-    return null;
-  }
-
-  Future<bool> deleteChapter(int chapterId) async {
-    final token = await _token();
-    if (token == null) return false;
-    final res = await http.delete(
-      Uri.parse('$customUrl/chapters/$chapterId'),
-      headers: _authHeaders(token),
-    );
-    return res.statusCode == 200;
-  }
-
-  Future<List<Map<String, dynamic>>> getMyStories() async {
-    final token = await _token();
-    if (token == null) return [];
-    final res = await http.get(
-      Uri.parse('$baseUrl/truyen?per_page=50'),
-      headers: _authHeaders(token),
-    );
-    if (res.statusCode == 200) {
-      final List data = jsonDecode(res.body);
-      return data.map<Map<String, dynamic>>((e) => {
-        'id': e['id'],
-        'title': e['title']?['rendered'] ?? '',
-        'status': e['status'] ?? '',
-      }).toList();
-    }
     return [];
   }
 }

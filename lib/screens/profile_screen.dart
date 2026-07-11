@@ -12,7 +12,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _api = ApiService();
   String? _username;
-  String? _userRole;
   List<Story> _bookmarks = [];
   List<Map<String, dynamic>> _history = [];
   bool _loading = true;
@@ -26,23 +25,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _load() async {
     final results = await Future.wait([
       _api.getUsername(),
-      _api.getUserRole(),
       _api.getBookmarks(),
       _api.getHistory(),
     ]);
     if (!mounted) return;
     setState(() {
       _username = results[0] as String?;
-      _userRole = results[1] as String?;
-      _bookmarks = results[2] as List<Story>;
-      _history = results[3] as List<Map<String, dynamic>>;
+      _bookmarks = results[1] as List<Story>;
+      _history = results[2] as List<Map<String, dynamic>>;
       _loading = false;
     });
   }
 
   String _roleName() {
-    if (_userRole == 'administrator') return 'Quản trị viên';
-    if (_userRole == 'tac_gia_role') return 'Tác giả';
     return 'Đọc giả';
   }
 

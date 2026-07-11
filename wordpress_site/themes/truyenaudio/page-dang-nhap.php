@@ -15,8 +15,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['username'])) {
             $redirect = $_GET['redirect_to'];
         } elseif (in_array('administrator', (array) $user->roles)) {
             $redirect = admin_url();
-        } elseif (in_array('tac_gia_role', (array) $user->roles)) {
-            $redirect = home_url('/tac-gia-dashboard');
         } else {
             $redirect = home_url('/profile');
         }
