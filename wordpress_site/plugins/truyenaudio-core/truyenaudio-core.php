@@ -35,12 +35,13 @@ function ta_register_post_types() {
             'add_new' => 'Thêm chương',
             'add_new_item' => 'Thêm chương mới',
         ],
-        'public' => true,
+        'public' => false,
+        'show_ui' => false,
         'has_archive' => false,
-        'menu_icon' => 'dashicons-media-document',
         'supports' => ['title', 'editor'],
         'rewrite' => ['slug' => 'chuong'],
         'show_in_rest' => true,
+        'show_in_menu' => false,
     ]);
 
     // Register chapter meta for REST API
@@ -392,30 +393,299 @@ function ta_save_story_meta($post_id) {
     if (isset($_POST['dao_price'])) update_post_meta($post_id, '_dao_price', intval($_POST['dao_price']));
 }
 
-function ta_can_read_chapter($chapter_id, $story_id = null) {
-    if (!$story_id) $story_id = get_post_meta($chapter_id, '_story_id', true);
-    $chapter_num = get_post_meta($chapter_id, '_chapter_number', true) ?: 0;
-    $free = get_post_meta($story_id, '_free_chapters', true) ?: 2;
-    $total = count(ta_get_chapters($story_id));
+// ==================== CHAPTER MANAGEMENT (in Story Edit) ====================
+add_action('add_meta_boxes', 'ta_add_story_chapters_meta');
+function ta_add_story_chapters_meta() {
+    add_meta_box('story_chapters', 'Quản lý Chương', 'ta_story_chapters_meta_html', 'truyen', 'normal', 'high');
+}
 
-    // Nếu truyện chỉ có 1 chương → cho xem free
-    if ($total <= 1) return true;
+function ta_story_chapters_meta_html($post) {
+    $story_id = $post->ID;
+    $chapters = ta_get_chapters($story_id);
+    $default_vip = get_option('ta_default_vip_price', 5);
+    wp_nonce_field('ta_story_chapters_meta', 'ta_story_chapters_nonce');
+    ?>
+    <style>
+        #ta-chapters-list { margin: 0; padding: 0; }
+        #ta-chapters-list .chapter-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 12px; margin-bottom: 6px;
+            background: #f9f9f9; border: 1px solid #ddd; border-radius: 6px;
+            transition: background 0.15s;
+        }
+        #ta-chapters-list .chapter-row:hover { background: #f0f4ff; }
+        .ch-num { font-weight: 700; min-width: 30px; color: #3568D4; }
+        .ch-title { flex: 1; font-weight: 500; }
+        .ch-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .ch-badge.vip { background: #ff6b35; color: #fff; }
+        .ch-badge.free { background: #2ecc71; color: #fff; }
+        .ch-price { color: #888; font-size: 12px; }
+        .ch-actions { display: flex; gap: 6px; }
+        .ch-actions button { padding: 4px 10px; font-size: 12px; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; background: #fff; }
+        .ch-actions .btn-edit { color: #3568D4; border-color: #3568D4; }
+        .ch-actions .btn-delete { color: #e74c3c; border-color: #e74c3c; }
+        #ta-add-chapter-form { display: none; margin-top: 16px; padding: 16px; background: #f0f4ff; border: 1px solid #3568D4; border-radius: 8px; }
+        #ta-add-chapter-form label { font-weight: 600; margin-bottom: 4px; display: block; font-size: 13px; }
+        #ta-add-chapter-form input[type="text"],
+        #ta-add-chapter-form input[type="url"],
+        #ta-add-chapter-form input[type="number"] { width: 100%; padding: 6px 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .ta-ch-row { display: flex; gap: 12px; margin-bottom: 8px; }
+        .ta-ch-row > div { flex: 1; }
+        .ta-ch-toggle { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .ta-ch-toggle input[type="checkbox"] { width: 18px; height: 18px; }
+        #ta-chapter-content-wrap { margin-bottom: 10px; }
+    </style>
+    <p style="margin-bottom:12px;">
+        <button type="button" class="button button-primary" id="ta-toggle-add-chapter">+ Thêm chương mới</button>
+        <span style="color:#888;font-size:13px;margin-left:10px;">(<?php echo count($chapters); ?> chương)</span>
+    </p>
+    <div id="ta-chapters-list">
+        <?php if (empty($chapters)): ?>
+            <p style="color:#888;text-align:center;padding:20px;">Chưa có chương nào. Nhấn "+ Thêm chương mới" để bắt đầu.</p>
+        <?php else: ?>
+            <?php foreach ($chapters as $ch):
+                $num = get_post_meta($ch->ID, '_chapter_number', true);
+                $is_vip = get_post_meta($ch->ID, '_is_vip', true);
+                $price = get_post_meta($ch->ID, '_vip_price', true);
+                ?>
+                <div class="chapter-row" data-id="<?php echo $ch->ID; ?>">
+                    <span class="ch-num">#<?php echo $num; ?></span>
+                    <span class="ch-title"><?php echo esc_html($ch->post_title); ?></span>
+                    <?php if ($is_vip): ?>
+                        <span class="ch-badge vip">VIP</span>
+                        <span class="ch-price"><?php echo $price; ?>💎</span>
+                    <?php else: ?>
+                        <span class="ch-badge free">FREE</span>
+                    <?php endif; ?>
+                    <span class="ch-actions">
+                        <button type="button" class="btn-edit" onclick="taEditChapter(<?php echo $ch->ID; ?>)">Sửa</button>
+                        <button type="button" class="btn-delete" onclick="taDeleteChapter(<?php echo $ch->ID; ?>)">Xóa</button>
+                    </span>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
 
-    // Nếu truyện có 2 chương: chương 1 free, chương 2 cần login
-    if ($total == 2) {
-        if ($chapter_num <= 1) return true;
-        return is_user_logged_in();
+    <div id="ta-add-chapter-form">
+        <h3 id="ta-form-title">Thêm chương mới</h3>
+        <input type="hidden" id="ta-edit-chapter-id" value="">
+        <div class="ta-ch-row">
+            <div>
+                <label>Số chương</label>
+                <input type="number" id="ta-ch-number" min="1" value="<?php echo count($chapters) + 1; ?>">
+            </div>
+            <div>
+                <label>Audio URL (MP3)</label>
+                <input type="url" id="ta-ch-audio" placeholder="https://example.com/audio.mp3">
+            </div>
+        </div>
+        <div>
+            <label>Tiêu đề chương</label>
+            <input type="text" id="ta-ch-title" placeholder="Ví dụ: Chương 1 - Khởi đầu">
+        </div>
+        <div>
+            <label>Nội dung chương</label>
+            <div id="ta-chapter-content-wrap">
+                <?php
+                wp_editor('', 'ta_chapter_content', [
+                    'textarea_name' => '',
+                    'textarea_rows' => 12,
+                    'media_buttons' => true,
+                    'teeny' => false,
+                    'quicktags' => true,
+                ]);
+                ?>
+            </div>
+        </div>
+        <div class="ta-ch-toggle">
+            <input type="checkbox" id="ta-ch-vip">
+            <label for="ta-ch-vip" style="margin-bottom:0;">Chương VIP (yêu cầu Linh Thạch để mở khóa)</label>
+        </div>
+        <div class="ta-ch-row" id="ta-ch-price-row">
+            <div>
+                <label>Giá VIP (Linh Thạch)</label>
+                <input type="number" id="ta-ch-price" min="1" value="<?php echo $default_vip; ?>">
+            </div>
+        </div>
+        <p>
+            <button type="button" class="button button-primary" id="ta-save-chapter" onclick="taSaveChapter()">Lưu chương</button>
+            <button type="button" class="button" id="ta-cancel-edit" onclick="taCancelEdit()">Hủy</button>
+        </p>
+    </div>
+
+    <script>
+    var taStoryId = <?php echo $story_id; ?>;
+    var taAjaxUrl = '<?php echo admin_url('admin-ajax.php'); ?>';
+    var taNonce = '<?php echo wp_create_nonce('ta_story_chapters_meta'); ?>';
+
+    jQuery(function($) {
+        $('#ta-toggle-add-chapter').on('click', function() {
+            $('#ta-add-chapter-form').slideToggle(200);
+            $('#ta-form-title').text('Thêm chương mới');
+            $('#ta-edit-chapter-id').val('');
+        });
+        $('#ta-ch-vip').on('change', function() {
+            $('#ta-ch-price-row').toggle(this.checked);
+        });
+        $('#ta-ch-price-row').hide();
+    });
+
+    function taSaveChapter() {
+        var editId = jQuery('#ta-edit-chapter-id').val();
+        var data = {
+            action: 'ta_save_chapter_admin',
+            nonce: taNonce,
+            story_id: taStoryId,
+            chapter_id: editId,
+            chapter_number: jQuery('#ta-ch-number').val(),
+            title: jQuery('#ta-ch-title').val(),
+            content: jQuery('#ta_chapter_content').val(),
+            audio_url: jQuery('#ta-ch-audio').val(),
+            is_vip: jQuery('#ta-ch-vip').is(':checked') ? '1' : '0',
+            vip_price: jQuery('#ta-ch-price').val()
+        };
+        if (!data.title) { alert('Vui lòng nhập tiêu đề chương'); return; }
+        jQuery.post(taAjaxUrl, data, function(res) {
+            if (res.success) { location.reload(); }
+            else { alert(res.data); }
+        });
     }
 
-    // Nhiều chương: free_chapters đầu free, phần còn lại cần login
-    if ($chapter_num <= $free) return true;
+    function taEditChapter(id) {
+        jQuery.post(taAjaxUrl, {action: 'ta_get_chapter_admin', nonce: taNonce, chapter_id: id}, function(res) {
+            if (!res.success) { alert(res.data); return; }
+            var d = res.data;
+            jQuery('#ta-edit-chapter-id').val(d.id);
+            jQuery('#ta-ch-number').val(d.chapter_number);
+            jQuery('#ta-ch-title').val(d.title);
+            jQuery('#ta-ch-audio').val(d.audio_url);
+            jQuery('#ta-ch-vip').prop('checked', d.is_vip === '1');
+            jQuery('#ta-ch-price').val(d.vip_price || 5);
+            jQuery('#ta-ch-price-row').toggle(d.is_vip === '1');
+            if (typeof tinymce !== 'undefined' && tinymce.get('ta_chapter_content')) {
+                tinymce.get('ta_chapter_content').setContent(d.content);
+            } else if (typeof QTags !== 'undefined') {
+                jQuery('#ta_chapter_content').val(d.content);
+            }
+            jQuery('#ta-form-title').text('Sửa chương #' + d.chapter_number);
+            jQuery('#ta-add-chapter-form').slideDown(200);
+            jQuery('html, body').animate({scrollTop: jQuery('#ta-add-chapter-form').offset().top - 50}, 300);
+        });
+    }
+
+    function taDeleteChapter(id) {
+        if (!confirm('Bạn có chắc muốn xóa chương này?')) return;
+        jQuery.post(taAjaxUrl, {action: 'ta_delete_chapter_admin', nonce: taNonce, chapter_id: id}, function(res) {
+            if (res.success) { location.reload(); }
+            else { alert(res.data); }
+        });
+    }
+
+    function taCancelEdit() {
+        jQuery('#ta-add-chapter-form').slideUp(200);
+        jQuery('#ta-edit-chapter-id').val('');
+        jQuery('#ta-ch-number').val(jQuery('.chapter-row').length + 1);
+        jQuery('#ta-ch-title').val('');
+        jQuery('#ta-ch-audio').val('');
+        jQuery('#ta-ch-vip').prop('checked', false);
+        jQuery('#ta-ch-price-row').hide();
+        if (typeof tinymce !== 'undefined' && tinymce.get('ta_chapter_content')) {
+            tinymce.get('ta_chapter_content').setContent('');
+        } else {
+            jQuery('#ta_chapter_content').val('');
+        }
+    }
+    </script>
+    <?php
+}
+
+// AJAX: Save chapter from admin story edit
+add_action('wp_ajax_ta_save_chapter_admin', 'ta_ajax_save_chapter_admin');
+function ta_ajax_save_chapter_admin() {
+    if (!current_user_can('administrator')) wp_send_json_error('Không có quyền');
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ta_story_chapters_meta')) wp_send_json_error('Nonce không hợp lệ');
+
+    $story_id = intval($_POST['story_id']);
+    $chapter_id = intval($_POST['chapter_id'] ?? 0);
+    $chapter_number = intval($_POST['chapter_number']);
+    $title = sanitize_text_field($_POST['title']);
+    $content = wp_kses_post($_POST['content']);
+    $audio_url = esc_url_raw($_POST['audio_url'] ?? '');
+    $is_vip = isset($_POST['is_vip']) && $_POST['is_vip'] === '1' ? '1' : '0';
+    $vip_price = intval($_POST['vip_price'] ?? get_option('ta_default_vip_price', 5));
+
+    if (empty($title)) wp_send_json_error('Thiếu tiêu đề');
+
+    if ($chapter_id) {
+        wp_update_post([
+            'ID' => $chapter_id,
+            'post_title' => $title,
+            'post_content' => $content,
+        ]);
+        update_post_meta($chapter_id, '_chapter_number', $chapter_number);
+        update_post_meta($chapter_id, '_audio_url', $audio_url);
+        update_post_meta($chapter_id, '_is_vip', $is_vip);
+        update_post_meta($chapter_id, '_vip_price', $vip_price);
+    } else {
+        $chapter_id = wp_insert_post([
+            'post_title' => $title,
+            'post_content' => $content,
+            'post_type' => 'chapter',
+            'post_status' => 'publish',
+            'post_author' => get_current_user_id(),
+        ]);
+        if (is_wp_error($chapter_id)) wp_send_json_error('Lỗi tạo chương');
+        update_post_meta($chapter_id, '_story_id', $story_id);
+        update_post_meta($chapter_id, '_chapter_number', $chapter_number);
+        update_post_meta($chapter_id, '_audio_url', $audio_url);
+        update_post_meta($chapter_id, '_is_vip', $is_vip);
+        update_post_meta($chapter_id, '_vip_price', $vip_price);
+    }
+
+    update_post_meta($story_id, '_chapter_count', count(ta_get_chapters($story_id)));
+    wp_send_json_success(['message' => $chapter_id ? 'Đã cập nhật chương' : 'Đã thêm chương mới']);
+}
+
+// AJAX: Get chapter data for editing
+add_action('wp_ajax_ta_get_chapter_admin', 'ta_ajax_get_chapter_admin');
+function ta_ajax_get_chapter_admin() {
+    if (!current_user_can('administrator')) wp_send_json_error('Không có quyền');
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ta_story_chapters_meta')) wp_send_json_error('Nonce không hợp lệ');
+
+    $id = intval($_POST['chapter_id']);
+    $post = get_post($id);
+    if (!$post || $post->post_type !== 'chapter') wp_send_json_error('Không tìm thấy chương');
+
+    wp_send_json_success([
+        'id' => $id,
+        'title' => $post->post_title,
+        'content' => $post->post_content,
+        'chapter_number' => get_post_meta($id, '_chapter_number', true),
+        'audio_url' => get_post_meta($id, '_audio_url', true),
+        'is_vip' => get_post_meta($id, '_is_vip', true),
+        'vip_price' => get_post_meta($id, '_vip_price', true),
+    ]);
+}
+
+// AJAX: Delete chapter from admin
+add_action('wp_ajax_ta_delete_chapter_admin', 'ta_ajax_delete_chapter_admin');
+function ta_ajax_delete_chapter_admin() {
+    if (!current_user_can('administrator')) wp_send_json_error('Không có quyền');
+    if (!wp_verify_nonce($_POST['nonce'] ?? '', 'ta_story_chapters_meta')) wp_send_json_error('Nonce không hợp lệ');
+
+    $id = intval($_POST['chapter_id']);
+    $story_id = get_post_meta($id, '_story_id', true);
+    wp_delete_post($id, true);
+    if ($story_id) update_post_meta($story_id, '_chapter_count', count(ta_get_chapters($story_id)));
+    wp_send_json_success(['message' => 'Đã xóa chương']);
+}
+
+function ta_can_read_chapter($chapter_id, $story_id = null) {
+    if (!$story_id) $story_id = get_post_meta($chapter_id, '_story_id', true);
+    $is_vip = get_post_meta($chapter_id, '_is_vip', true);
+    if (current_user_can('administrator')) return true;
     if (!is_user_logged_in()) return false;
-
-    // Đã login: kiểm tra Đào Linh Thạch
-    $dao = get_post_meta($story_id, '_dao_linh_thach', true);
-    if ($dao !== '1') return true;
-
-    // Đào linh thạch: kiểm tra đã mua chương này chưa
+    if ($is_vip !== '1') return true;
     return ta_has_purchased($chapter_id);
 }
 
@@ -499,14 +769,10 @@ add_action('edit_user_profile', 'ta_show_linh_thach_admin');
 function ta_show_linh_thach_admin($user) {
     if (!current_user_can('administrator')) return;
     $lt = get_user_meta($user->ID, '_linh_thach', true) ?: 0;
-    $earnings = get_user_meta($user->ID, '_author_earnings', true) ?: 0;
-    $withdrawn = get_user_meta($user->ID, '_author_withdrawn', true) ?: 0;
     ?>
-    <h3>Linh Thạch & Doanh thu</h3>
+    <h3>Linh Thạch</h3>
     <table class="form-table">
         <tr><th>Số dư Linh Thạch</th><td><input type="number" step="any" name="linh_thach" value="<?php echo $lt; ?>"></td></tr>
-        <tr><th>Doanh thu tác giả</th><td><input type="number" step="any" name="author_earnings" value="<?php echo $earnings; ?>"></td></tr>
-        <tr><th>Đã rút</th><td><input type="number" name="author_withdrawn" value="<?php echo $withdrawn; ?>"></td></tr>
     </table>
     <?php
 }
@@ -516,8 +782,6 @@ add_action('edit_user_profile_update', 'ta_save_linh_thach_admin');
 function ta_save_linh_thach_admin($user_id) {
     if (!current_user_can('administrator')) return;
     if (isset($_POST['linh_thach'])) update_user_meta($user_id, '_linh_thach', floatval($_POST['linh_thach']));
-    if (isset($_POST['author_earnings'])) update_user_meta($user_id, '_author_earnings', floatval($_POST['author_earnings']));
-    if (isset($_POST['author_withdrawn'])) update_user_meta($user_id, '_author_withdrawn', intval($_POST['author_withdrawn']));
 }
 
 // ==================== VIP CHAPTER PURCHASE ====================
@@ -555,31 +819,13 @@ function ta_purchase_vip_chapter() {
     update_user_meta($user_id, '_purchased_chapters', $purchased);
 
     // Track revenue
-    $revenue_rate = get_option('ta_revenue_rate', 15);
     $revenue = get_post_meta($story_id, '_story_revenue', true) ?: 0;
     $revenue += $vip_price;
     update_post_meta($story_id, '_story_revenue', $revenue);
 
-    // Credit author earnings (15% of story revenue)
-    $author_profit = round(($vip_price * $revenue_rate) / 100);
-    if ($author_profit > 0 && $story_id) {
-        $author_id = get_post_field('post_author', $story_id);
-        if ($author_id) {
-            $author_earnings = get_user_meta($author_id, '_author_earnings', true) ?: 0;
-            $author_earnings += $author_profit;
-            update_user_meta($author_id, '_author_earnings', $author_earnings);
-
-            // Also add linh thạch directly to author balance
-            $author_lt = get_user_meta($author_id, '_linh_thach', true) ?: 0;
-            $author_lt += $author_profit;
-            update_user_meta($author_id, '_linh_thach', $author_lt);
-        }
-    }
-
     wp_send_json_success([
         'message' => 'Mua thành công! Bạn đã mở khóa chương VIP.',
         'new_balance' => $new_lt,
-        'profit' => $author_profit,
     ]);
 }
 
@@ -740,28 +986,18 @@ function ta_admin_menu() {
     );
     add_submenu_page(
         'truyenaudio-settings',
-        'Cấu hình doanh thu',
+        'Cấu hình',
         'Cấu hình',
         'manage_options',
         'truyenaudio-settings',
         'ta_settings_page'
     );
-    add_submenu_page(
-        'truyenaudio-settings',
-        'Yêu cầu rút tiền',
-        'Yêu cầu rút tiền',
-        'manage_options',
-        'truyenaudio-withdrawals',
-        'ta_withdrawals_admin_page'
-    );
 }
 
 function ta_settings_page() {
     if (isset($_POST['save_settings']) && wp_verify_nonce($_POST['_wpnonce'], 'ta_settings')) {
-        update_option('ta_revenue_rate', intval($_POST['revenue_rate']));
-        update_option('ta_min_withdrawal', intval($_POST['min_withdrawal']));
         update_option('ta_lt_to_vnd', intval($_POST['lt_to_vnd']));
-        update_option('ta_withdrawal_fee', intval($_POST['withdrawal_fee']));
+        update_option('ta_default_vip_price', intval($_POST['default_vip_price']));
         update_option('ta_fb_app_id', sanitize_text_field($_POST['fb_app_id']));
         update_option('ta_fb_app_secret', sanitize_text_field($_POST['fb_app_secret']));
         update_option('ta_google_client_id', sanitize_text_field($_POST['google_client_id']));
@@ -786,11 +1022,8 @@ function ta_settings_page() {
         update_option('ta_lt_packages', $packages);
         echo '<div class="notice notice-success"><p>Đã lưu cấu hình.</p></div>';
     }
-    $rate = get_option('ta_revenue_rate', 15);
-    $min_wd = get_option('ta_min_withdrawal', 10000);
     $lt_vnd = get_option('ta_lt_to_vnd', 1000);
-    $wd_fee = get_option('ta_withdrawal_fee', 3);
-    $wd_fee = get_option('ta_withdrawal_fee', 3);
+    $default_vip = get_option('ta_default_vip_price', 5);
     $fb_id = get_option('ta_fb_app_id', '');
     $fb_secret = get_option('ta_fb_app_secret', '');
     $gg_id = get_option('ta_google_client_id', '');
@@ -803,17 +1036,10 @@ function ta_settings_page() {
             <?php wp_nonce_field('ta_settings'); ?>
             <table class="form-table">
                 <tr>
-                    <th>Tỷ lệ hoa hồng tác giả</th>
+                    <th>Mặc định giá VIP chương mới</th>
                     <td>
-                        <input type="number" name="revenue_rate" value="<?php echo $rate; ?>" min="0" max="100"> %
-                        <p class="description">Phần trăm doanh thu truyện tác giả được nhận (mặc định 15%)</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Số LT rút tối thiểu</th>
-                    <td>
-                        <input type="number" name="min_withdrawal" value="<?php echo $min_wd; ?>" min="1000">
-                        <p class="description">Số Linh Thạch tối thiểu để yêu cầu rút</p>
+                        <input type="number" name="default_vip_price" value="<?php echo $default_vip; ?>" min="1">
+                        <p class="description">Giá Linh Thạch mặc định khi tạo chương mới (admin có thể sửa từng chương)</p>
                     </td>
                 </tr>
                 <tr>
@@ -821,13 +1047,6 @@ function ta_settings_page() {
                     <td>
                         <input type="number" name="lt_to_vnd" value="<?php echo $lt_vnd; ?>" min="1">
                         <p class="description">Quy đổi 1 Linh Thạch sang VNĐ</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th>Phí rút tiền (%)</th>
-                    <td>
-                        <input type="number" name="withdrawal_fee" value="<?php echo $wd_fee; ?>" min="0" max="100">
-                        <p class="description">Phần trăm phí khi tác giả rút Linh Thạch (mặc định 3%)</p>
                     </td>
                 </tr>
                 <tr>
@@ -908,78 +1127,12 @@ function ta_settings_page() {
     <?php
 }
 
-function ta_withdrawals_admin_page() {
-    global $wpdb;
-    if (isset($_GET['approved'])) echo '<div class="notice notice-success"><p>✅ Đã duyệt yêu cầu rút tiền.</p></div>';
-    if (isset($_GET['rejected'])) echo '<div class="notice notice-info"><p>Đã từ chối yêu cầu rút tiền.</p></div>';
-    ?>
-    <div class="wrap">
-        <h1>Yêu cầu rút tiền</h1>
-        <table class="wp-list-table widefat fixed striped">
-            <thead>
-                <tr>
-                    <th>Người dùng</th>
-                    <th>Số lượng</th>
-                    <th>Phí</th>
-                    <th>Thực nhận</th>
-                    <th>Phương thức</th>
-                    <th>Thông tin TK</th>
-                    <th>Ngày yêu cầu</th>
-                    <th>Trạng thái</th>
-                    <th>Hành động</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $users = get_users(['meta_key' => '_withdrawal_requests']);
-                $found = false;
-                foreach ($users as $u) {
-                    $requests = get_user_meta($u->ID, '_withdrawal_requests', true) ?: [];
-                    foreach ($requests as $i => $r) {
-                        $found = true;
-                        ?>
-                        <tr>
-                            <td><a href="<?php echo admin_url('user-edit.php?user_id=' . $u->ID); ?>"><?php echo $u->display_name; ?></a></td>
-                            <td>💎<?php echo number_format($r['amount']); ?></td>
-                            <td><?php echo isset($r['fee']) ? number_format($r['fee']) . ' LT (' . $r['fee_pct'] . '%)' : '—'; ?></td>
-                            <td><?php echo isset($r['net']) ? number_format($r['net']) . ' LT' : '—'; ?></td>
-                            <td><?php echo $r['method']; ?></td>
-                            <td><?php echo esc_html($r['account_info']); ?></td>
-                            <td><?php echo $r['time']; ?></td>
-                            <td>
-                                <?php if ($r['status'] == 'pending'): ?><span style="color:#f39c12;">Chờ duyệt</span>
-                                <?php elseif ($r['status'] == 'approved'): ?><span style="color:#2ecc71;">Đã duyệt</span>
-                                <?php else: ?><span style="color:#e74c3c;">Từ chối</span><?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($r['status'] == 'pending'): ?>
-                                    <a class="button button-primary" href="<?php echo admin_url('admin-ajax.php?action=ta_approve_withdrawal&user_id=' . $u->ID . '&index=' . $i . '&_wpnonce=' . wp_create_nonce('ta_withdrawal_nonce')); ?>">Duyệt</a>
-                                    <a class="button" href="<?php echo admin_url('admin-ajax.php?action=ta_reject_withdrawal&user_id=' . $u->ID . '&index=' . $i . '&_wpnonce=' . wp_create_nonce('ta_withdrawal_nonce')); ?>">Từ chối</a>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php
-                    }
-                }
-                if (!$found) echo '<tr><td colspan="9" style="text-align:center;">Chưa có yêu cầu nào</td></tr>';
-                ?>
-            </tbody>
-        </table>
-    </div>
-    <?php
-}
-
-// ==================== REST API: UPGRADE TO AUTHOR ====================
+// ==================== REST API ====================
 add_action('rest_api_init', function () {
     register_rest_route('wp/v2', '/users/register', [
         'methods' => 'POST',
         'callback' => 'ta_register_user',
         'permission_callback' => '__return_true',
-    ]);
-    register_rest_route('truyenaudio/v1', '/upgrade-author', [
-        'methods' => 'POST',
-        'callback' => 'ta_rest_upgrade_author',
-        'permission_callback' => 'is_user_logged_in',
     ]);
 
     // Chapters by story ID
@@ -1040,7 +1193,8 @@ function ta_rest_get_chapters($request) {
         $data[] = [
             'id' => $ch->ID,
             'title' => $ch->post_title,
-            'content' => apply_filters('the_content', $ch->post_content),
+            'content' => ta_can_read_chapter($ch->ID, $story_id) ? apply_filters('the_content', $ch->post_content) : '',
+            'can_read' => ta_can_read_chapter($ch->ID, $story_id),
             'meta' => [
                 '_story_id' => get_post_meta($ch->ID, '_story_id', true),
                 '_chapter_number' => get_post_meta($ch->ID, '_chapter_number', true),
@@ -1257,21 +1411,6 @@ function ta_rest_purchase_vip($request) {
     $revenue = get_post_meta($story_id, '_story_revenue', true) ?: 0;
     $revenue += $vip_price;
     update_post_meta($story_id, '_story_revenue', $revenue);
-
-    $rate = get_option('ta_revenue_rate', 15);
-    $author_profit = round(($vip_price * $rate) / 100);
-    if ($author_profit > 0) {
-        $author_id = get_post_field('post_author', $story_id);
-        if ($author_id) {
-            $author_earnings = get_user_meta($author_id, '_author_earnings', true) ?: 0;
-            $author_earnings += $author_profit;
-            update_user_meta($author_id, '_author_earnings', $author_earnings);
-
-            $author_lt = get_user_meta($author_id, '_linh_thach', true) ?: 0;
-            $author_lt += $author_profit;
-            update_user_meta($author_id, '_linh_thach', $author_lt);
-        }
-    }
 
     return new WP_REST_Response([
         'message' => 'Mua thành công!',
@@ -1592,77 +1731,6 @@ function ta_notify_report($story_id, $reporter_id, $status) {
             ta_add_notification($author_id, 'success', '✅ Báo cáo về truyện "' . $story_title . '" đã được xem xét và không có vi phạm. Cảm ơn bạn!', $story_link);
         }
     }
-}
-
-// Override withdrawal approval/rejection to fire hooks
-add_action('wp_ajax_ta_approve_withdrawal', 'ta_approve_withdrawal');
-function ta_approve_withdrawal() {
-    if (!current_user_can('administrator')) wp_die('Unauthorized');
-    if (!wp_verify_nonce($_GET['_wpnonce'], 'ta_withdrawal_nonce')) wp_die('Invalid nonce');
-
-    $user_id = intval($_GET['user_id']);
-    $index = intval($_GET['index']);
-    $requests = get_user_meta($user_id, '_withdrawal_requests', true) ?: [];
-
-    if (!isset($requests[$index]) || $requests[$index]['status'] != 'pending') {
-        wp_die('Invalid request');
-    }
-
-    $amount = $requests[$index]['amount'];
-    $requests[$index]['status'] = 'approved';
-    $requests[$index]['approved_time'] = current_time('mysql');
-
-    $withdrawn = get_user_meta($user_id, '_author_withdrawn', true) ?: 0;
-    $withdrawn += $amount;
-    update_user_meta($user_id, '_author_withdrawn', $withdrawn);
-
-    $balance = get_user_meta($user_id, '_linh_thach', true) ?: 0;
-    $balance -= $amount;
-    if ($balance < 0) $balance = 0;
-    update_user_meta($user_id, '_linh_thach', $balance);
-
-    update_user_meta($user_id, '_withdrawal_requests', $requests);
-
-    $history = get_user_meta($user_id, '_lt_history', true) ?: [];
-    $history[] = [
-        'type' => 'withdrawal',
-        'amount' => -$amount,
-        'fee' => $requests[$index]['fee'],
-        'net' => $requests[$index]['net'],
-        'method' => $requests[$index]['method'],
-        'note' => 'Rút tiền: ' . number_format($amount) . ' LT (phí ' . $requests[$index]['fee_pct'] . '%)',
-        'time' => current_time('mysql'),
-    ];
-    update_user_meta($user_id, '_lt_history', $history);
-
-    do_action('ta_withdrawal_processed', $user_id, 'approved', $amount);
-
-    wp_redirect(admin_url('admin.php?page=truyenaudio-withdrawals&approved=1'));
-    exit;
-}
-
-add_action('wp_ajax_ta_reject_withdrawal', 'ta_reject_withdrawal');
-function ta_reject_withdrawal() {
-    if (!current_user_can('administrator')) wp_die('Unauthorized');
-    if (!wp_verify_nonce($_GET['_wpnonce'], 'ta_withdrawal_nonce')) wp_die('Invalid nonce');
-
-    $user_id = intval($_GET['user_id']);
-    $index = intval($_GET['index']);
-    $requests = get_user_meta($user_id, '_withdrawal_requests', true) ?: [];
-
-    if (!isset($requests[$index]) || $requests[$index]['status'] != 'pending') {
-        wp_die('Invalid request');
-    }
-
-    $amount = $requests[$index]['amount'];
-    $requests[$index]['status'] = 'rejected';
-    $requests[$index]['rejected_time'] = current_time('mysql');
-    update_user_meta($user_id, '_withdrawal_requests', $requests);
-
-    do_action('ta_withdrawal_processed', $user_id, 'rejected', $amount);
-
-    wp_redirect(admin_url('admin.php?page=truyenaudio-withdrawals&rejected=1'));
-    exit;
 }
 
 // Hook report status change to fire notification

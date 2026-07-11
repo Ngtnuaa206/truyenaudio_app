@@ -298,8 +298,8 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                                 if (ch.isVip) ...[
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                    decoration: BoxDecoration(color: const Color(0xFFF0C040), borderRadius: BorderRadius.circular(4)),
-                                    child: const Text('VIP', style: TextStyle(color: Color(0xFF1A1A2E), fontSize: 9, fontWeight: FontWeight.bold)),
+                                    decoration: BoxDecoration(color: const Color(0xFFFF6B35), borderRadius: BorderRadius.circular(4)),
+                                    child: Text('VIP ${ch.vipPrice}💎', style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
                                   ),
                                   const SizedBox(width: 6),
                                 ],
@@ -313,7 +313,7 @@ class _StoryDetailScreenState extends State<StoryDetailScreen> {
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: subColor, size: 22),
+                    Icon(ch.canRead ? Icons.chevron_right : Icons.lock_outline, color: ch.canRead ? subColor : const Color(0xFFFF6B35), size: 22),
                   ],
                 ),
               ),
