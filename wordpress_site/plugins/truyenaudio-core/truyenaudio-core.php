@@ -36,6 +36,7 @@ function ta_register_post_types() {
             'add_new_item' => 'Thêm chương mới',
         ],
         'public' => false,
+        'publicly_queryable' => true,
         'show_ui' => false,
         'has_archive' => false,
         'supports' => ['title', 'editor'],
@@ -2034,7 +2035,6 @@ register_activation_hook(__FILE__, function() {
     ta_register_post_types();
     ta_register_lt_order();
     ta_add_roles();
-    // Default packages
     if (!get_option('ta_lt_packages')) {
         update_option('ta_lt_packages', [
             ['id' => 'pkg_0', 'lt' => 1000, 'vnd' => 10000, 'bonus' => 0],
@@ -2044,6 +2044,16 @@ register_activation_hook(__FILE__, function() {
         ]);
     }
     flush_rewrite_rules();
+    update_option('ta_plugin_version', '2.1');
+});
+
+add_action('admin_init', function() {
+    $current = get_option('ta_plugin_version', '0');
+    if ($current !== '2.1') {
+        ta_register_post_types();
+        flush_rewrite_rules();
+        update_option('ta_plugin_version', '2.1');
+    }
 });
 
 // Expose roles to authenticated user via REST API
