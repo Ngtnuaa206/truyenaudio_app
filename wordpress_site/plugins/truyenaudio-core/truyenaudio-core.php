@@ -1,0 +1,2019 @@
+<?php
+/**
+ * Plugin Name: TruyenAudio Core
+ * Description: Custom post types and functionality for web truyện
+ * Version: 2.0
+ */
+
+// Register Story CPT
+add_action('init', 'ta_register_post_types');
+function ta_register_post_types() {
+    register_post_type('truyen', [
+        'labels' => [
+            'name' => 'Truyện',
+            'singular_name' => 'Truyện',
+            'add_new' => 'Thêm truyện',
+            'add_new_item' => 'Thêm truyện mới',
+            'edit_item' => 'Sửa truyện',
+        ],
+        'public' => true,
+        'has_archive' => true,
+        'menu_icon' => 'dashicons-book',
+        'menu_position' => 5,
+        'supports' => ['title', 'editor', 'thumbnail', 'excerpt', 'author'],
+        'rewrite' => ['slug' => 'truyen'],
+        'show_in_rest' => true,
+        'show_in_menu' => true,
+        'capability_type' => 'post',
+        'map_meta_cap' => true,
+    ]);
+
+    register_post_type('chapter', [
+        'labels' => [
+            'name' => 'Chương',
+            'singular_name' => 'Chương',
+            'add_new' => 'Thêm chương',
+            'add_new_item' => 'Thêm chương mới',
+        ],
+        'public' => true,
+        'has_archive' => false,
+        'menu_icon' => 'dashicons-media-document',
+        'supports' => ['title', 'editor'],
+        'rewrite' => ['slug' => 'chuong'],
+        'show_in_rest' => true,
+    ]);
+
+    register_taxonomy('the_loai', 'truyen', [
+        'labels' => [
+            'name' => 'Thể loại',
+            'singular_name' => 'Thể loại',
+            'add_new_item' => 'Thêm thể loại mới',
+        ],
+        'hierarchical' => true,
+        'rewrite' => ['slug' => 'the-loai'],
+        'show_in_rest' => true,
+    ]);
+
+    register_taxonomy('tac_gia', 'truyen', [
+        'labels' => [
+            'name' => 'Tác giả',
+            'singular_name' => 'Tác giả',
+            'add_new_item' => 'Thêm tác giả mới',
+        ],
+        'hierarchical' => false,
+        'rewrite' => ['slug' => 'tac-gia'],
+        'show_in_rest' => true,
+    ]);
+
+    register_taxonomy('trang_thai', 'truyen', [
+        'labels' => [
+            'name' => 'Trạng thái',
+            'singular_name' => 'Trạng thái',
+        ],
+        'hierarchical' => true,
+        'rewrite' => ['slug' => 'trang-thai'],
+        'show_in_rest' => true,
+    ]);
+
+    register_post_type('report', [
+        'labels' => [
+            'name' => 'Báo cáo',
+            'singular_name' => 'Báo cáo',
+        ],
+        'public' => false,
+        'show_ui' => true,
+        'show_in_menu' => 'edit.php?post_type=truyen',
+        'supports' => ['title', 'editor'],
+        'capability_type' => 'post',
+        'map_meta_cap' => true,
+        'rewrite' => false,
+        'exclude_from_search' => true,
+        'publicly_queryable' => false,
+        'has_archive' => false,
+    ]);
+}
+
+// ==================== REPORT SYSTEM ====================
+add_action('add_meta_boxes', 'ta_add_report_meta');
+function ta_add_report_meta() {
+    add_meta_box('report_details', 'Chi tiết báo cáo', 'ta_report_meta_html', 'report', 'normal');
+}
+
+function ta_report_meta_html($post) {
+    $story_id = get_post_meta($post->ID, '_reported_story_id', true);
+    $reporter_id = get_post_meta($post->ID, '_reporter_id', true);
+    $reason = get_post_meta($post->ID, '_report_reason', true);
+    $status = get_post_meta($post->ID, '_report_status', true) ?: 'pending';
+    $story = $story_id ? get_post($story_id) : null;
+    $reporter = $reporter_id ? get_userdata($reporter_id) : null;
+    $reasons = [
+        'spam' => 'Spam / Quảng cáo',
+        'inappropriate' => 'Nội dung không phù hợp',
+        'copyright' => 'Vi phạm bản quyền',
+        'wrong_category' => 'Sai thể loại / mô tả',
+        'other' => 'Khác',
+    ];
+    ?>
+    <p><strong>Truyện bị báo cáo:</strong>
+        <?php if ($story): ?>
+            <a href="<?php echo get_permalink($story_id); ?>" target="_blank"><?php echo esc_html($story->post_title); ?></a>
+            (ID: <?php echo $story_id; ?>)
+        <?php else: ?>
+            N/A (ID: <?php echo $story_id; ?>)
+        <?php endif; ?>
+    </p>
+    <p><strong>Người báo cáo:</strong> <?php echo $reporter ? esc_html($reporter->display_name) . ' (' . esc_html($reporter->user_login) . ')' : 'N/A'; ?></p>
+    <p><strong>Lý do:</strong> <?php echo isset($reasons[$reason]) ? $reasons[$reason] : esc_html($reason); ?></p>
+    <p><strong>Trạng thái:</strong>
+        <select name="report_status">
+            <option value="pending" <?php selected($status, 'pending'); ?>>⏳ Chờ xử lý</option>
+            <option value="resolved" <?php selected($status, 'resolved'); ?>>✅ Đã xử lý</option>
+            <option value="dismissed" <?php selected($status, 'dismissed'); ?>>❌ Bỏ qua</option>
+        </select>
+    </p>
+    <?php if ($status === 'pending'): ?>
+    <p style="color:#f39c12;">🔔 Báo cáo này đang chờ xem xét.</p>
+    <?php endif; ?>
+    <?php
+}
+
+add_action('save_post', 'ta_save_report_meta');
+function ta_save_report_meta($post_id) {
+    if (get_post_type($post_id) !== 'report') return;
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+    if (isset($_POST['report_status'])) {
+        update_post_meta($post_id, '_report_status', sanitize_text_field($_POST['report_status']));
+    }
+}
+
+add_filter('manage_report_posts_columns', 'ta_report_columns');
+function ta_report_columns($columns) {
+    $new = [];
+    $new['cb'] = $columns['cb'];
+    $new['title'] = 'Báo cáo';
+    $new['report_story'] = 'Truyện';
+    $new['report_reporter'] = 'Người báo cáo';
+    $new['report_reason'] = 'Lý do';
+    $new['report_status'] = 'Trạng thái';
+    $new['date'] = $columns['date'];
+    return $new;
+}
+
+add_action('manage_report_posts_custom_column', 'ta_report_columns_content', 10, 2);
+function ta_report_columns_content($column, $post_id) {
+    if ($column === 'report_story') {
+        $story_id = get_post_meta($post_id, '_reported_story_id', true);
+        $story = $story_id ? get_post($story_id) : null;
+        if ($story) {
+            echo '<a href="' . get_permalink($story_id) . '" target="_blank">' . esc_html($story->post_title) . '</a>';
+            echo '<br><small style="color:#888;">ID: ' . $story_id . '</small>';
+        } else {
+            echo 'N/A';
+        }
+    }
+    if ($column === 'report_reporter') {
+        $reporter_id = get_post_meta($post_id, '_reporter_id', true);
+        $reporter = $reporter_id ? get_userdata($reporter_id) : null;
+        echo $reporter ? esc_html($reporter->display_name) : 'N/A';
+    }
+    if ($column === 'report_reason') {
+        $reason = get_post_meta($post_id, '_report_reason', true);
+        $reasons = [
+            'spam' => 'Spam / Quảng cáo',
+            'inappropriate' => 'Nội dung không phù hợp',
+            'copyright' => 'Vi phạm bản quyền',
+            'wrong_category' => 'Sai thể loại / mô tả',
+            'other' => 'Khác',
+        ];
+        echo isset($reasons[$reason]) ? $reasons[$reason] : esc_html($reason);
+    }
+    if ($column === 'report_status') {
+        $status = get_post_meta($post_id, '_report_status', true) ?: 'pending';
+        $labels = [
+            'pending' => '<span style="color:#f39c12;">⏳ Chờ</span>',
+            'resolved' => '<span style="color:#2ecc71;">✅ Xong</span>',
+            'dismissed' => '<span style="color:#e74c3c;">❌ Bỏ qua</span>',
+        ];
+        echo $labels[$status] ?? $status;
+    }
+}
+
+add_filter('manage_edit-report_sortable_columns', 'ta_report_sortable_columns');
+function ta_report_sortable_columns($columns) {
+    $columns['report_status'] = 'report_status';
+    return $columns;
+}
+
+// AJAX: Submit report
+add_action('wp_ajax_ta_report_story', 'ta_ajax_report_story');
+add_action('wp_ajax_nopriv_ta_report_story', 'ta_ajax_report_story');
+function ta_ajax_report_story() {
+    if (!is_user_logged_in()) {
+        wp_send_json_error('Vui lòng đăng nhập để báo cáo.');
+    }
+
+    $story_id = intval($_POST['story_id'] ?? 0);
+    $reason = sanitize_text_field($_POST['reason'] ?? '');
+    $details = sanitize_textarea_field($_POST['details'] ?? '');
+
+    if (!$story_id || !get_post($story_id)) {
+        wp_send_json_error('Không tìm thấy truyện.');
+    }
+    if (!in_array($reason, ['spam', 'inappropriate', 'copyright', 'wrong_category', 'other'])) {
+        wp_send_json_error('Lý do không hợp lệ.');
+    }
+
+    $user_id = get_current_user_id();
+
+    // Check if user already reported this story
+    $existing = get_posts([
+        'post_type' => 'report',
+        'meta_query' => [
+            ['key' => '_reported_story_id', 'value' => $story_id],
+            ['key' => '_reporter_id', 'value' => $user_id],
+            ['key' => '_report_status', 'value' => 'pending'],
+        ],
+        'numberposts' => 1,
+    ]);
+    if ($existing) {
+        wp_send_json_error('Bạn đã báo cáo truyện này rồi. Admin sẽ xem xét sớm!');
+    }
+
+    $report_id = wp_insert_post([
+        'post_title' => 'Báo cáo: ' . get_the_title($story_id) . ' (#' . $story_id . ')',
+        'post_content' => $details,
+        'post_type' => 'report',
+        'post_status' => 'publish',
+        'post_author' => $user_id,
+    ]);
+
+    if (is_wp_error($report_id)) {
+        wp_send_json_error('Lỗi khi gửi báo cáo.');
+    }
+
+    update_post_meta($report_id, '_reported_story_id', $story_id);
+    update_post_meta($report_id, '_reporter_id', $user_id);
+    update_post_meta($report_id, '_report_reason', $reason);
+    update_post_meta($report_id, '_report_status', 'pending');
+
+    wp_send_json_success(['message' => '✅ Báo cáo đã được gửi! Admin sẽ xem xét sớm nhất.']);
+}
+
+// ==================== Add role: Author (Tác giả) ====================
+function ta_add_roles() {
+    add_role('tac_gia_role', 'Tác giả', [
+        'read' => true,
+        'edit_posts' => true,
+        'publish_posts' => true,
+        'delete_posts' => true,
+        'upload_files' => true,
+    ]);
+}
+
+// ==================== CHAPTER META ====================
+add_action('add_meta_boxes', 'ta_add_chapter_meta');
+function ta_add_chapter_meta() {
+    add_meta_box('chapter_details', 'Chi tiết chương', 'ta_chapter_meta_html', 'chapter', 'side');
+}
+
+function ta_chapter_meta_html($post) {
+    $story_id = get_post_meta($post->ID, '_story_id', true);
+    $chapter_num = get_post_meta($post->ID, '_chapter_number', true);
+    $audio_url = get_post_meta($post->ID, '_audio_url', true);
+    $is_vip = get_post_meta($post->ID, '_is_vip', true);
+    $vip_price = get_post_meta($post->ID, '_vip_price', true) ?: 5;
+    ?>
+    <p>
+        <label>Truyện:</label>
+        <select name="story_id" style="width:100%">
+            <option value="">-- Chọn truyện --</option>
+            <?php
+            $stories = get_posts(['post_type' => 'truyen', 'numberposts' => -1]);
+            foreach ($stories as $s) {
+                echo '<option value="' . $s->ID . '" ' . selected($story_id, $s->ID, false) . '>' . esc_html($s->post_title) . '</option>';
+            }
+            ?>
+        </select>
+    </p>
+    <p>
+        <label>Số chương:</label>
+        <input type="number" name="chapter_number" value="<?php echo $chapter_num; ?>" style="width:100%">
+    </p>
+    <p>
+        <label>Audio URL (MP3):</label>
+        <input type="url" name="audio_url" value="<?php echo esc_url($audio_url); ?>" style="width:100%" placeholder="https://...mp3">
+    </p>
+    <p>
+        <label>
+            <input type="checkbox" name="is_vip" value="1" <?php checked($is_vip, '1'); ?>>
+            Chương VIP
+        </label>
+    </p>
+    <p>
+        <label>Giá VIP (Linh Thạch):</label>
+        <input type="number" name="vip_price" value="<?php echo $vip_price; ?>" style="width:100%" min="1">
+    </p>
+    <?php
+}
+
+add_action('save_post', 'ta_save_chapter_meta');
+function ta_save_chapter_meta($post_id) {
+    if (get_post_type($post_id) !== 'chapter') return;
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+    if (!current_user_can('edit_post', $post_id)) return;
+
+    if (isset($_POST['story_id'])) update_post_meta($post_id, '_story_id', intval($_POST['story_id']));
+    if (isset($_POST['chapter_number'])) update_post_meta($post_id, '_chapter_number', intval($_POST['chapter_number']));
+    if (isset($_POST['audio_url'])) update_post_meta($post_id, '_audio_url', esc_url_raw($_POST['audio_url']));
+    if (isset($_POST['is_vip'])) update_post_meta($post_id, '_is_vip', '1'); else update_post_meta($post_id, '_is_vip', '0');
+    if (isset($_POST['vip_price'])) update_post_meta($post_id, '_vip_price', intval($_POST['vip_price']));
+}
+
+// ==================== STORY META ====================
+add_action('add_meta_boxes', 'ta_add_story_meta');
+function ta_add_story_meta() {
+    add_meta_box('story_details', 'Chi tiết truyện', 'ta_story_meta_html', 'truyen', 'side');
+    add_meta_box('story_author_box', 'Tác giả (bút danh)', 'ta_story_author_meta_html', 'truyen', 'side');
+    add_meta_box('story_dao_box', 'Cài đặt Đào Linh Thạch', 'ta_story_dao_meta_html', 'truyen', 'side');
+}
+
+function ta_story_meta_html($post) {
+    $views = get_post_meta($post->ID, '_views', true) ?: 0;
+    $rating = get_post_meta($post->ID, '_rating', true) ?: 0;
+    $rating_count = get_post_meta($post->ID, '_rating_count', true) ?: 0;
+    $revenue = get_post_meta($post->ID, '_story_revenue', true) ?: 0;
+    ?>
+    <p>
+        <label>Lượt xem:</label>
+        <input type="number" name="story_views" value="<?php echo $views; ?>" style="width:100%" min="0">
+    </p>
+    <p>
+        <label>Đánh giá (/5):</label>
+        <input type="number" name="story_rating" value="<?php echo $rating; ?>" style="width:80px" min="0" max="5" step="0.1">
+        <input type="number" name="story_rating_count" value="<?php echo $rating_count; ?>" style="width:70px" min="0" placeholder="Lượt">
+    </p>
+    <p>
+        <label>Doanh thu (💎):</label>
+        <input type="number" name="story_revenue" value="<?php echo $revenue; ?>" style="width:100%" min="0">
+    </p>
+    <?php
+}
+
+function ta_story_author_meta_html($post) {
+    $author_user_id = $post->post_author;
+    $pen_name = get_post_meta($post->ID, '_pen_name', true);
+    $user = get_userdata($author_user_id);
+    ?>
+    <p><label>Người đăng (WP User):</label> <strong><?php echo $user ? $user->display_name . ' (' . $user->user_login . ')' : 'N/A'; ?></strong></p>
+    <p>
+        <label>Bút danh hiển thị:</label>
+        <input type="text" name="pen_name" value="<?php echo esc_attr($pen_name); ?>" style="width:100%" placeholder="Nhập bút danh">
+        <small style="color:#888;">Sẽ tự động thêm vào taxonomy Tác giả</small>
+    </p>
+    <?php
+}
+
+function ta_story_dao_meta_html($post) {
+    $dao = get_post_meta($post->ID, '_dao_linh_thach', true);
+    $free = get_post_meta($post->ID, '_free_chapters', true) ?: 2;
+    $price = get_post_meta($post->ID, '_dao_price', true) ?: 3;
+    ?>
+    <p>
+        <label>
+            <input type="checkbox" name="dao_linh_thach" value="1" <?php checked($dao, '1'); ?>>
+            🔥 Bật chế độ Đào Linh Thạch
+        </label>
+        <br><small style="color:#888;">Người dùng phải trả LT để đọc chương sau chương miễn phí</small>
+    </p>
+    <p>
+        <label>Số chương miễn phí đầu:</label>
+        <input type="number" name="free_chapters" value="<?php echo $free; ?>" style="width:100%" min="1" max="100">
+    </p>
+    <p>
+        <label>Giá mỗi chương (💎):</label>
+        <input type="number" name="dao_price" value="<?php echo $price; ?>" style="width:100%" min="1" max="100">
+    </p>
+    <?php
+}
+
+add_action('save_post', 'ta_save_story_meta');
+function ta_save_story_meta($post_id) {
+    if (get_post_type($post_id) !== 'truyen') return;
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+    if (!current_user_can('edit_post', $post_id)) return;
+
+    if (isset($_POST['story_views'])) update_post_meta($post_id, '_views', intval($_POST['story_views']));
+    if (isset($_POST['story_rating'])) update_post_meta($post_id, '_rating', floatval($_POST['story_rating']));
+    if (isset($_POST['story_rating_count'])) update_post_meta($post_id, '_rating_count', intval($_POST['story_rating_count']));
+    if (isset($_POST['story_revenue'])) update_post_meta($post_id, '_story_revenue', intval($_POST['story_revenue']));
+
+    if (isset($_POST['dao_linh_thach'])) update_post_meta($post_id, '_dao_linh_thach', '1'); else update_post_meta($post_id, '_dao_linh_thach', '0');
+    if (isset($_POST['free_chapters'])) update_post_meta($post_id, '_free_chapters', intval($_POST['free_chapters']));
+    if (isset($_POST['dao_price'])) update_post_meta($post_id, '_dao_price', intval($_POST['dao_price']));
+
+    if (isset($_POST['pen_name']) && !empty($_POST['pen_name'])) {
+        $pen_name = sanitize_text_field($_POST['pen_name']);
+        update_post_meta($post_id, '_pen_name', $pen_name);
+        $term = term_exists($pen_name, 'tac_gia');
+        if (!$term) $term = wp_insert_term($pen_name, 'tac_gia');
+        if (!is_wp_error($term)) {
+            wp_set_post_terms($post_id, [intval($term['term_id'])], 'tac_gia', true);
+        }
+    }
+}
+
+function ta_can_read_chapter($chapter_id, $story_id = null) {
+    if (!$story_id) $story_id = get_post_meta($chapter_id, '_story_id', true);
+    $chapter_num = get_post_meta($chapter_id, '_chapter_number', true) ?: 0;
+    $free = get_post_meta($story_id, '_free_chapters', true) ?: 2;
+    $total = count(ta_get_chapters($story_id));
+
+    // Nếu truyện chỉ có 1 chương → cho xem free
+    if ($total <= 1) return true;
+
+    // Nếu truyện có 2 chương: chương 1 free, chương 2 cần login
+    if ($total == 2) {
+        if ($chapter_num <= 1) return true;
+        return is_user_logged_in();
+    }
+
+    // Nhiều chương: free_chapters đầu free, phần còn lại cần login
+    if ($chapter_num <= $free) return true;
+    if (!is_user_logged_in()) return false;
+
+    // Đã login: kiểm tra Đào Linh Thạch
+    $dao = get_post_meta($story_id, '_dao_linh_thach', true);
+    if ($dao !== '1') return true;
+
+    // Đào linh thạch: kiểm tra đã mua chương này chưa
+    return ta_has_purchased($chapter_id);
+}
+
+// Track views
+add_action('wp', 'ta_track_views');
+function ta_track_views() {
+    if (is_singular('truyen')) {
+        $post_id = get_the_ID();
+        $views = get_post_meta($post_id, '_views', true) ?: 0;
+        update_post_meta($post_id, '_views', $views + 1);
+    }
+}
+
+// Get chapters of a story
+function ta_get_chapters($story_id) {
+    return get_posts([
+        'post_type' => 'chapter',
+        'meta_query' => [
+            ['key' => '_story_id', 'value' => $story_id, 'compare' => '='],
+        ],
+        'meta_key' => '_chapter_number',
+        'orderby' => 'meta_value_num',
+        'order' => 'ASC',
+        'numberposts' => -1,
+    ]);
+}
+
+// AJAX rating
+add_action('wp_ajax_rate_story', 'ta_rate_story');
+function ta_rate_story() {
+    $post_id = intval($_POST['post_id']);
+    $rating = intval($_POST['rating']);
+    if ($rating < 1 || $rating > 5) wp_die('Invalid');
+
+    $old_rating = get_post_meta($post_id, '_rating', true) ?: 0;
+    $count = get_post_meta($post_id, '_rating_count', true) ?: 0;
+    $new_rating = (($old_rating * $count) + $rating) / ($count + 1);
+    update_post_meta($post_id, '_rating', round($new_rating, 1));
+    update_post_meta($post_id, '_rating_count', $count + 1);
+
+    $user_id = get_current_user_id();
+    $ratings = get_post_meta($post_id, '_user_ratings', true) ?: [];
+    $ratings[$user_id] = $rating;
+    update_post_meta($post_id, '_user_ratings', $ratings);
+
+    wp_send_json(['rating' => round($new_rating, 1), 'count' => $count + 1]);
+}
+
+// Bookmarks
+add_action('wp_ajax_toggle_bookmark', 'ta_toggle_bookmark');
+function ta_toggle_bookmark() {
+    $user_id = get_current_user_id();
+    $post_id = intval($_POST['post_id']);
+    $bookmarks = get_user_meta($user_id, '_bookmarks', true) ?: [];
+    if (in_array($post_id, $bookmarks)) {
+        $bookmarks = array_diff($bookmarks, [$post_id]);
+        $status = 'removed';
+    } else {
+        $bookmarks[] = $post_id;
+        $status = 'added';
+    }
+    update_user_meta($user_id, '_bookmarks', $bookmarks);
+    wp_send_json(['status' => $status]);
+}
+
+// Reading history
+add_action('wp_ajax_save_history', 'ta_save_history');
+function ta_save_history() {
+    $user_id = get_current_user_id();
+    $chapter_id = intval($_POST['chapter_id']);
+    $story_id = intval($_POST['story_id']);
+    $history = get_user_meta($user_id, '_reading_history', true) ?: [];
+    $history[$story_id] = ['chapter_id' => $chapter_id, 'time' => current_time('mysql')];
+    update_user_meta($user_id, '_reading_history', $history);
+    wp_die();
+}
+
+// ==================== LINH THẠCH SYSTEM ====================
+add_action('show_user_profile', 'ta_show_linh_thach_admin');
+add_action('edit_user_profile', 'ta_show_linh_thach_admin');
+function ta_show_linh_thach_admin($user) {
+    if (!current_user_can('administrator')) return;
+    $lt = get_user_meta($user->ID, '_linh_thach', true) ?: 0;
+    $earnings = get_user_meta($user->ID, '_author_earnings', true) ?: 0;
+    $withdrawn = get_user_meta($user->ID, '_author_withdrawn', true) ?: 0;
+    ?>
+    <h3>Linh Thạch & Doanh thu</h3>
+    <table class="form-table">
+        <tr><th>Số dư Linh Thạch</th><td><input type="number" step="any" name="linh_thach" value="<?php echo $lt; ?>"></td></tr>
+        <tr><th>Doanh thu tác giả</th><td><input type="number" step="any" name="author_earnings" value="<?php echo $earnings; ?>"></td></tr>
+        <tr><th>Đã rút</th><td><input type="number" name="author_withdrawn" value="<?php echo $withdrawn; ?>"></td></tr>
+    </table>
+    <?php
+}
+
+add_action('personal_options_update', 'ta_save_linh_thach_admin');
+add_action('edit_user_profile_update', 'ta_save_linh_thach_admin');
+function ta_save_linh_thach_admin($user_id) {
+    if (!current_user_can('administrator')) return;
+    if (isset($_POST['linh_thach'])) update_user_meta($user_id, '_linh_thach', floatval($_POST['linh_thach']));
+    if (isset($_POST['author_earnings'])) update_user_meta($user_id, '_author_earnings', floatval($_POST['author_earnings']));
+    if (isset($_POST['author_withdrawn'])) update_user_meta($user_id, '_author_withdrawn', intval($_POST['author_withdrawn']));
+}
+
+// ==================== VIP CHAPTER PURCHASE ====================
+add_action('wp_ajax_purchase_vip_chapter', 'ta_purchase_vip_chapter');
+function ta_purchase_vip_chapter() {
+    $user_id = get_current_user_id();
+    $chapter_id = intval($_POST['chapter_id']);
+
+    if (!$user_id) wp_send_json_error('Vui lòng đăng nhập');
+    if (!$chapter_id) wp_send_json_error('Không tìm thấy chương');
+
+    $story_id = get_post_meta($chapter_id, '_story_id', true);
+    $is_vip = get_post_meta($chapter_id, '_is_vip', true);
+    $vip_price = get_post_meta($chapter_id, '_vip_price', true) ?: 5;
+
+    if (!$is_vip) wp_send_json_error('Chương này không phải VIP');
+
+    // Check if already purchased
+    $purchased = get_user_meta($user_id, '_purchased_chapters', true) ?: [];
+    if (in_array($chapter_id, $purchased)) {
+        wp_send_json_error('Bạn đã mua chương này rồi');
+    }
+
+    $lt = get_user_meta($user_id, '_linh_thach', true) ?: 0;
+    if ($lt < $vip_price) {
+        wp_send_json_error('Không đủ Linh Thạch. Cần ' . $vip_price . ' LT');
+    }
+
+    // Deduct linh thạch
+    $new_lt = $lt - $vip_price;
+    update_user_meta($user_id, '_linh_thach', $new_lt);
+
+    // Add to purchased list
+    $purchased[] = $chapter_id;
+    update_user_meta($user_id, '_purchased_chapters', $purchased);
+
+    // Track revenue
+    $revenue_rate = get_option('ta_revenue_rate', 15);
+    $revenue = get_post_meta($story_id, '_story_revenue', true) ?: 0;
+    $revenue += $vip_price;
+    update_post_meta($story_id, '_story_revenue', $revenue);
+
+    // Credit author earnings (15% of story revenue)
+    $author_profit = round(($vip_price * $revenue_rate) / 100);
+    if ($author_profit > 0 && $story_id) {
+        $author_id = get_post_field('post_author', $story_id);
+        if ($author_id) {
+            $author_earnings = get_user_meta($author_id, '_author_earnings', true) ?: 0;
+            $author_earnings += $author_profit;
+            update_user_meta($author_id, '_author_earnings', $author_earnings);
+
+            // Also add linh thạch directly to author balance
+            $author_lt = get_user_meta($author_id, '_linh_thach', true) ?: 0;
+            $author_lt += $author_profit;
+            update_user_meta($author_id, '_linh_thach', $author_lt);
+        }
+    }
+
+    wp_send_json_success([
+        'message' => 'Mua thành công! Bạn đã mở khóa chương VIP.',
+        'new_balance' => $new_lt,
+        'profit' => $author_profit,
+    ]);
+}
+
+// ==================== UPGRADE USER TO AUTHOR ====================
+add_action('wp_ajax_ta_upgrade_to_author', 'ta_upgrade_to_author');
+add_action('wp_ajax_nopriv_ta_upgrade_to_author', 'ta_upgrade_to_author');
+function ta_upgrade_to_author() {
+    $user_id = get_current_user_id();
+    if (!$user_id) wp_send_json_error('Vui lòng đăng nhập');
+
+    $user = get_userdata($user_id);
+    if (in_array('tac_gia_role', (array) $user->roles)) {
+        wp_send_json_error('Bạn đã là tác giả rồi');
+    }
+    if (in_array('administrator', (array) $user->roles)) {
+        wp_send_json_error('Admin không cần nâng cấp');
+    }
+
+    $user->set_role('tac_gia_role');
+    ta_set_flash('success', '✍️ Chúc mừng! Bạn đã trở thành tác giả. Hãy đăng truyện ngay!');
+    wp_send_json_success(['message' => 'Chúc mừng! Bạn đã trở thành tác giả.']);
+}
+
+// ==================== WITHDRAWAL SYSTEM ====================
+add_action('wp_ajax_ta_request_withdrawal', 'ta_request_withdrawal');
+function ta_request_withdrawal() {
+    $user_id = get_current_user_id();
+    if (!$user_id) wp_send_json_error('Vui lòng đăng nhập');
+
+    $amount = floatval($_POST['amount']);
+    $method = sanitize_text_field($_POST['method']);
+    $account_info = sanitize_text_field($_POST['account_info']);
+    $fee_pct = get_option('ta_withdrawal_fee', 3);
+    $fee = floor($amount * $fee_pct / 100);
+    $net = $amount - $fee;
+
+    $min_wd = get_option('ta_min_withdrawal', 10000);
+    if ($amount < $min_wd) wp_send_json_error('Số lượng rút tối thiểu là ' . number_format($min_wd) . ' Linh Thạch');
+    if (empty($method)) wp_send_json_error('Chọn phương thức rút tiền');
+    if (empty($account_info)) wp_send_json_error('Nhập thông tin tài khoản');
+
+    $balance = get_user_meta($user_id, '_linh_thach', true) ?: 0;
+    $withdrawn = get_user_meta($user_id, '_author_withdrawn', true) ?: 0;
+    $available = $balance - $withdrawn;
+
+    if ($amount > $available) {
+        wp_send_json_error('Bạn chỉ có thể rút tối đa ' . number_format($available) . ' Linh Thạch');
+    }
+
+    $requests = get_user_meta($user_id, '_withdrawal_requests', true) ?: [];
+    $requests[] = [
+        'amount' => $amount,
+        'fee_pct' => $fee_pct,
+        'fee' => $fee,
+        'net' => $net,
+        'method' => $method,
+        'account_info' => $account_info,
+        'status' => 'pending',
+        'time' => current_time('mysql'),
+    ];
+    update_user_meta($user_id, '_withdrawal_requests', $requests);
+
+    // Log history
+    $history = get_user_meta($user_id, '_lt_history', true) ?: [];
+    $history[] = [
+        'type' => 'withdrawal_request',
+        'amount' => -$amount,
+        'fee' => $fee,
+        'net' => $net,
+        'method' => $method,
+        'note' => 'Yêu cầu rút ' . number_format($amount) . ' LT (phí ' . $fee_pct . '%, thực nhận ' . number_format($net) . ' LT)',
+        'time' => current_time('mysql'),
+    ];
+    update_user_meta($user_id, '_lt_history', $history);
+
+    ta_set_flash('success', '✅ Yêu cầu rút ' . number_format($amount) . ' Linh Thạch đã được gửi. Admin sẽ xử lý sớm nhất!');
+    wp_send_json_success(['message' => 'Yêu cầu rút tiền đã được gửi (phí ' . $fee_pct . '%, thực nhận ' . number_format($net) . ' LT).']);
+}
+
+// Admin approval: show withdrawal requests in user profile
+add_action('show_user_profile', 'ta_show_withdrawal_requests');
+add_action('edit_user_profile', 'ta_show_withdrawal_requests');
+function ta_show_withdrawal_requests($user) {
+    if (!current_user_can('administrator')) return;
+    $requests = get_user_meta($user->ID, '_withdrawal_requests', true) ?: [];
+    if (empty($requests)) return;
+    ?>
+    <h3>Yêu cầu rút tiền</h3>
+    <table class="form-table">
+        <tr>
+            <th>Thời gian</th>
+            <th>Số lượng</th>
+            <th>Phí</th>
+            <th>Thực nhận</th>
+            <th>Phương thức</th>
+            <th>Thông tin</th>
+            <th>Trạng thái</th>
+            <th>Hành động</th>
+        </tr>
+        <?php foreach ($requests as $i => $r): ?>
+        <tr>
+            <td><?php echo $r['time']; ?></td>
+            <td><?php echo number_format($r['amount']); ?> LT</td>
+            <td><?php echo isset($r['fee']) ? number_format($r['fee']) . ' LT (' . $r['fee_pct'] . '%)' : '—'; ?></td>
+            <td><?php echo isset($r['net']) ? number_format($r['net']) . ' LT' : '—'; ?></td>
+            <td><?php echo $r['method']; ?></td>
+            <td><?php echo esc_html($r['account_info']); ?></td>
+            <td>
+                <?php if ($r['status'] == 'pending'): ?>
+                    <span style="color:#f39c12;">Chờ duyệt</span>
+                <?php elseif ($r['status'] == 'approved'): ?>
+                    <span style="color:#2ecc71;">Đã duyệt</span>
+                <?php else: ?>
+                    <span style="color:#e74c3c;">Từ chối</span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if ($r['status'] == 'pending'): ?>
+                    <button type="button" class="button button-primary" onclick="window.location.href='<?php echo admin_url('admin-ajax.php?action=ta_approve_withdrawal&user_id=' . $user->ID . '&index=' . $i . '&_wpnonce=' . wp_create_nonce('ta_withdrawal_nonce')); ?>'">Duyệt</button>
+                    <button type="button" class="button" onclick="window.location.href='<?php echo admin_url('admin-ajax.php?action=ta_reject_withdrawal&user_id=' . $user->ID . '&index=' . $i . '&_wpnonce=' . wp_create_nonce('ta_withdrawal_nonce')); ?>'">Từ chối</button>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+    </table>
+    <?php
+}
+
+// ==================== SOCIAL LOGIN (OAUTH) ====================
+add_action('init', 'ta_oauth_rewrite');
+function ta_oauth_rewrite() {
+    add_rewrite_rule('^ta-oauth/([^/]+)/?$', 'index.php?ta_oauth=$matches[1]', 'top');
+}
+add_filter('query_vars', function ($vars) { $vars[] = 'ta_oauth'; return $vars; });
+add_action('template_redirect', 'ta_oauth_callback');
+function ta_oauth_callback() {
+    $action = get_query_var('ta_oauth');
+    if (!$action) return;
+
+    // Facebook callback
+    if ($action === 'facebook' && isset($_GET['code'])) {
+        $app_id = get_option('ta_fb_app_id');
+        $app_secret = get_option('ta_fb_app_secret');
+        $redirect_uri = home_url('ta-oauth/facebook');
+        $code = $_GET['code'];
+
+        // Exchange code for token
+        $token_url = "https://graph.facebook.com/v18.0/oauth/access_token?client_id=$app_id&redirect_uri=$redirect_uri&client_secret=$app_secret&code=$code";
+        $token_resp = wp_remote_get($token_url);
+        if (is_wp_error($token_resp)) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+        $token_body = json_decode(wp_remote_retrieve_body($token_resp), true);
+        if (empty($token_body['access_token'])) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+
+        // Get user info
+        $graph_url = "https://graph.facebook.com/me?fields=id,name,email&access_token=" . $token_body['access_token'];
+        $graph_resp = wp_remote_get($graph_url);
+        if (is_wp_error($graph_resp)) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+        $user_data = json_decode(wp_remote_retrieve_body($graph_resp), true);
+        if (empty($user_data['id'])) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+
+        $fb_id = $user_data['id'];
+        $email = !empty($user_data['email']) ? $user_data['email'] : 'fb_' . $fb_id . '@ta-social.com';
+        $name = !empty($user_data['name']) ? $user_data['name'] : 'User_' . $fb_id;
+
+        $user = get_users(['meta_key' => '_social_fb_id', 'meta_value' => $fb_id]);
+        if (!empty($user)) {
+            $user_id = $user[0]->ID;
+        } elseif (email_exists($email)) {
+            $user_id = email_exists($email);
+            update_user_meta($user_id, '_social_fb_id', $fb_id);
+        } else {
+            $username = 'fb_' . $fb_id;
+            $suffix = '';
+            while (username_exists($username . $suffix)) { $suffix = $suffix ? '_' . ($suffix + 1) : '_1'; }
+            $user_id = wp_insert_user([
+                'user_login' => $username . $suffix,
+                'user_email' => $email,
+                'user_pass'  => wp_generate_password(),
+                'display_name' => $name,
+                'role' => 'subscriber',
+            ]);
+            if (is_wp_error($user_id)) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+            update_user_meta($user_id, '_email_verified', '1');
+            update_user_meta($user_id, '_social_fb_id', $fb_id);
+        }
+
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id);
+        ta_set_flash('success', '🎉 Đăng nhập thành công với Facebook!');
+        wp_redirect(home_url('/profile'));
+        exit;
+    }
+
+    // Google callback
+    if ($action === 'google' && isset($_GET['code'])) {
+        $client_id = get_option('ta_google_client_id');
+        $client_secret = get_option('ta_google_client_secret');
+        $redirect_uri = home_url('ta-oauth/google');
+        $code = $_GET['code'];
+
+        // Exchange code for token
+        $token_resp = wp_remote_post('https://oauth2.googleapis.com/token', [
+            'body' => [
+                'code' => $code,
+                'client_id' => $client_id,
+                'client_secret' => $client_secret,
+                'redirect_uri' => $redirect_uri,
+                'grant_type' => 'authorization_code',
+            ],
+        ]);
+        if (is_wp_error($token_resp)) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+        $token_body = json_decode(wp_remote_retrieve_body($token_resp), true);
+        if (empty($token_body['access_token'])) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+
+        // Get user info
+        $user_resp = wp_remote_get('https://www.googleapis.com/oauth2/v2/userinfo?access_token=' . $token_body['access_token']);
+        if (is_wp_error($user_resp)) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+        $user_data = json_decode(wp_remote_retrieve_body($user_resp), true);
+        if (empty($user_data['id'])) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+
+        $google_id = $user_data['id'];
+        $email = $user_data['email'] ?? 'google_' . $google_id . '@ta-social.com';
+        $name = $user_data['name'] ?? 'User_' . $google_id;
+
+        $user = get_users(['meta_key' => '_social_google_id', 'meta_value' => $google_id]);
+        if (!empty($user)) {
+            $user_id = $user[0]->ID;
+        } elseif (email_exists($email)) {
+            $user_id = email_exists($email);
+            update_user_meta($user_id, '_social_google_id', $google_id);
+        } else {
+            $username = 'google_' . $google_id;
+            $suffix = '';
+            while (username_exists($username . $suffix)) { $suffix = $suffix ? '_' . ($suffix + 1) : '_1'; }
+            $user_id = wp_insert_user([
+                'user_login' => $username . $suffix,
+                'user_email' => $email,
+                'user_pass'  => wp_generate_password(),
+                'display_name' => $name,
+                'role' => 'subscriber',
+            ]);
+            if (is_wp_error($user_id)) { wp_redirect(home_url('/dang-nhap?login=social_error')); exit; }
+            update_user_meta($user_id, '_email_verified', '1');
+            update_user_meta($user_id, '_social_google_id', $google_id);
+        }
+
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id);
+        ta_set_flash('success', '🎉 Đăng nhập thành công với Google!');
+        wp_redirect(home_url('/profile'));
+        exit;
+    }
+
+    wp_redirect(home_url('/dang-nhap?login=social_error'));
+    exit;
+}
+
+// Social login URL helpers
+function ta_fb_login_url() {
+    $app_id = get_option('ta_fb_app_id');
+    if (!$app_id) return '#';
+    $redirect = urlencode(home_url('ta-oauth/facebook'));
+    return "https://www.facebook.com/v18.0/dialog/oauth?client_id=$app_id&redirect_uri=$redirect&scope=email,public_profile";
+}
+function ta_google_login_url() {
+    $client_id = get_option('ta_google_client_id');
+    if (!$client_id) return '#';
+    $redirect = urlencode(home_url('ta-oauth/google'));
+    return "https://accounts.google.com/o/oauth2/auth?client_id=$client_id&redirect_uri=$redirect&scope=email+profile&response_type=code";
+}
+
+// ==================== ADMIN SETTINGS ====================
+add_action('admin_menu', 'ta_admin_menu');
+function ta_admin_menu() {
+    add_menu_page(
+        'TruyenAudio',
+        'TruyenAudio',
+        'manage_options',
+        'truyenaudio-settings',
+        'ta_settings_page',
+        'dashicons-book',
+        30
+    );
+    add_submenu_page(
+        'truyenaudio-settings',
+        'Cấu hình doanh thu',
+        'Cấu hình',
+        'manage_options',
+        'truyenaudio-settings',
+        'ta_settings_page'
+    );
+    add_submenu_page(
+        'truyenaudio-settings',
+        'Yêu cầu rút tiền',
+        'Yêu cầu rút tiền',
+        'manage_options',
+        'truyenaudio-withdrawals',
+        'ta_withdrawals_admin_page'
+    );
+}
+
+function ta_settings_page() {
+    if (isset($_POST['save_settings']) && wp_verify_nonce($_POST['_wpnonce'], 'ta_settings')) {
+        update_option('ta_revenue_rate', intval($_POST['revenue_rate']));
+        update_option('ta_min_withdrawal', intval($_POST['min_withdrawal']));
+        update_option('ta_lt_to_vnd', intval($_POST['lt_to_vnd']));
+        update_option('ta_withdrawal_fee', intval($_POST['withdrawal_fee']));
+        update_option('ta_fb_app_id', sanitize_text_field($_POST['fb_app_id']));
+        update_option('ta_fb_app_secret', sanitize_text_field($_POST['fb_app_secret']));
+        update_option('ta_google_client_id', sanitize_text_field($_POST['google_client_id']));
+        update_option('ta_google_client_secret', sanitize_text_field($_POST['google_client_secret']));
+        // Save packages
+        $packages = [];
+        if (isset($_POST['pkg_lt']) && is_array($_POST['pkg_lt'])) {
+            foreach ($_POST['pkg_lt'] as $i => $lt) {
+                $lt = intval($lt);
+                $vnd = intval($_POST['pkg_vnd'][$i] ?? 0);
+                $bonus = intval($_POST['pkg_bonus'][$i] ?? 0);
+                if ($lt > 0 && $vnd > 0) {
+                    $packages[] = [
+                        'id' => 'pkg_' . $i,
+                        'lt' => $lt,
+                        'vnd' => $vnd,
+                        'bonus' => $bonus,
+                    ];
+                }
+            }
+        }
+        update_option('ta_lt_packages', $packages);
+        echo '<div class="notice notice-success"><p>Đã lưu cấu hình.</p></div>';
+    }
+    $rate = get_option('ta_revenue_rate', 15);
+    $min_wd = get_option('ta_min_withdrawal', 10000);
+    $lt_vnd = get_option('ta_lt_to_vnd', 1000);
+    $wd_fee = get_option('ta_withdrawal_fee', 3);
+    $wd_fee = get_option('ta_withdrawal_fee', 3);
+    $fb_id = get_option('ta_fb_app_id', '');
+    $fb_secret = get_option('ta_fb_app_secret', '');
+    $gg_id = get_option('ta_google_client_id', '');
+    $gg_secret = get_option('ta_google_client_secret', '');
+    $packages = get_option('ta_lt_packages', []);
+    ?>
+    <div class="wrap">
+        <h1>TruyenAudio - Cấu hình</h1>
+        <form method="post">
+            <?php wp_nonce_field('ta_settings'); ?>
+            <table class="form-table">
+                <tr>
+                    <th>Tỷ lệ hoa hồng tác giả</th>
+                    <td>
+                        <input type="number" name="revenue_rate" value="<?php echo $rate; ?>" min="0" max="100"> %
+                        <p class="description">Phần trăm doanh thu truyện tác giả được nhận (mặc định 15%)</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Số LT rút tối thiểu</th>
+                    <td>
+                        <input type="number" name="min_withdrawal" value="<?php echo $min_wd; ?>" min="1000">
+                        <p class="description">Số Linh Thạch tối thiểu để yêu cầu rút</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th>1 Linh Thạch = ? VNĐ</th>
+                    <td>
+                        <input type="number" name="lt_to_vnd" value="<?php echo $lt_vnd; ?>" min="1">
+                        <p class="description">Quy đổi 1 Linh Thạch sang VNĐ</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Phí rút tiền (%)</th>
+                    <td>
+                        <input type="number" name="withdrawal_fee" value="<?php echo $wd_fee; ?>" min="0" max="100">
+                        <p class="description">Phần trăm phí khi tác giả rút Linh Thạch (mặc định 3%)</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th colspan="2"><h3 style="margin:10px 0 0;">🔐 Đăng nhập Facebook</h3></th>
+                </tr>
+                <tr>
+                    <th>Facebook App ID</th>
+                    <td><input type="text" name="fb_app_id" value="<?php echo esc_attr($fb_id); ?>" style="width:300px;">
+                        <p class="description">Lấy từ <a href="https://developers.facebook.com" target="_blank">Facebook Developers</a></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Facebook App Secret</th>
+                    <td><input type="text" name="fb_app_secret" value="<?php echo esc_attr($fb_secret); ?>" style="width:300px;">
+                        <p class="description">Redirect URI: <code><?php echo home_url('ta-oauth/facebook'); ?></code></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th colspan="2"><h3 style="margin:10px 0 0;">🔐 Đăng nhập Google</h3></th>
+                </tr>
+                <tr>
+                    <th>Google Client ID</th>
+                    <td><input type="text" name="google_client_id" value="<?php echo esc_attr($gg_id); ?>" style="width:400px;">
+                        <p class="description">Lấy từ <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Google Client Secret</th>
+                    <td><input type="text" name="google_client_secret" value="<?php echo esc_attr($gg_secret); ?>" style="width:400px;">
+                        <p class="description">Redirect URI: <code><?php echo home_url('ta-oauth/google'); ?></code></p>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Gói nạp Linh Thạch</th>
+                    <td>
+                        <p class="description">Cấu hình các gói nạp hiển thị cho người dùng.</p>
+                        <table style="border-collapse:collapse;margin-top:10px;">
+                            <thead>
+                                <tr style="border-bottom:1px solid #ccc;">
+                                    <th style="padding:6px 12px;text-align:left;">Linh Thạch</th>
+                                    <th style="padding:6px 12px;text-align:left;">Giá (VNĐ)</th>
+                                    <th style="padding:6px 12px;text-align:left;">Bonus %</th>
+                                    <th style="padding:6px 12px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="ta-pkg-rows">
+                                <?php foreach ($packages as $i => $p): ?>
+                                <tr>
+                                    <td><input type="number" name="pkg_lt[]" value="<?php echo $p['lt']; ?>" min="1" style="width:100px;"></td>
+                                    <td><input type="number" name="pkg_vnd[]" value="<?php echo $p['vnd']; ?>" min="1" style="width:120px;"></td>
+                                    <td><input type="number" name="pkg_bonus[]" value="<?php echo $p['bonus']; ?>" min="0" max="500" style="width:80px;"></td>
+                                    <td><button type="button" class="button ta-remove-pkg" style="color:#a00;">Xóa</button></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        <button type="button" class="button" id="ta-add-pkg">+ Thêm gói</button>
+                    </td>
+                </tr>
+            </table>
+            <p><button type="submit" name="save_settings" class="button button-primary">Lưu cấu hình</button></p>
+        </form>
+        <script>
+        jQuery(function($) {
+            $('#ta-add-pkg').on('click', function() {
+                var row = '<tr><td><input type="number" name="pkg_lt[]" value="1000" min="1" style="width:100px;"></td>' +
+                    '<td><input type="number" name="pkg_vnd[]" value="10000" min="1" style="width:120px;"></td>' +
+                    '<td><input type="number" name="pkg_bonus[]" value="0" min="0" max="500" style="width:80px;"></td>' +
+                    '<td><button type="button" class="button ta-remove-pkg" style="color:#a00;">Xóa</button></td></tr>';
+                $('#ta-pkg-rows').append(row);
+            });
+            $('#ta-pkg-rows').on('click', '.ta-remove-pkg', function() {
+                $(this).closest('tr').remove();
+            });
+        });
+        </script>
+    </div>
+    <?php
+}
+
+function ta_withdrawals_admin_page() {
+    global $wpdb;
+    if (isset($_GET['approved'])) echo '<div class="notice notice-success"><p>✅ Đã duyệt yêu cầu rút tiền.</p></div>';
+    if (isset($_GET['rejected'])) echo '<div class="notice notice-info"><p>Đã từ chối yêu cầu rút tiền.</p></div>';
+    ?>
+    <div class="wrap">
+        <h1>Yêu cầu rút tiền</h1>
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th>Người dùng</th>
+                    <th>Số lượng</th>
+                    <th>Phí</th>
+                    <th>Thực nhận</th>
+                    <th>Phương thức</th>
+                    <th>Thông tin TK</th>
+                    <th>Ngày yêu cầu</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $users = get_users(['meta_key' => '_withdrawal_requests']);
+                $found = false;
+                foreach ($users as $u) {
+                    $requests = get_user_meta($u->ID, '_withdrawal_requests', true) ?: [];
+                    foreach ($requests as $i => $r) {
+                        $found = true;
+                        ?>
+                        <tr>
+                            <td><a href="<?php echo admin_url('user-edit.php?user_id=' . $u->ID); ?>"><?php echo $u->display_name; ?></a></td>
+                            <td>💎<?php echo number_format($r['amount']); ?></td>
+                            <td><?php echo isset($r['fee']) ? number_format($r['fee']) . ' LT (' . $r['fee_pct'] . '%)' : '—'; ?></td>
+                            <td><?php echo isset($r['net']) ? number_format($r['net']) . ' LT' : '—'; ?></td>
+                            <td><?php echo $r['method']; ?></td>
+                            <td><?php echo esc_html($r['account_info']); ?></td>
+                            <td><?php echo $r['time']; ?></td>
+                            <td>
+                                <?php if ($r['status'] == 'pending'): ?><span style="color:#f39c12;">Chờ duyệt</span>
+                                <?php elseif ($r['status'] == 'approved'): ?><span style="color:#2ecc71;">Đã duyệt</span>
+                                <?php else: ?><span style="color:#e74c3c;">Từ chối</span><?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($r['status'] == 'pending'): ?>
+                                    <a class="button button-primary" href="<?php echo admin_url('admin-ajax.php?action=ta_approve_withdrawal&user_id=' . $u->ID . '&index=' . $i . '&_wpnonce=' . wp_create_nonce('ta_withdrawal_nonce')); ?>">Duyệt</a>
+                                    <a class="button" href="<?php echo admin_url('admin-ajax.php?action=ta_reject_withdrawal&user_id=' . $u->ID . '&index=' . $i . '&_wpnonce=' . wp_create_nonce('ta_withdrawal_nonce')); ?>">Từ chối</a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php
+                    }
+                }
+                if (!$found) echo '<tr><td colspan="9" style="text-align:center;">Chưa có yêu cầu nào</td></tr>';
+                ?>
+            </tbody>
+        </table>
+    </div>
+    <?php
+}
+
+// ==================== REST API: UPGRADE TO AUTHOR ====================
+add_action('rest_api_init', function () {
+    register_rest_route('wp/v2', '/users/register', [
+        'methods' => 'POST',
+        'callback' => 'ta_register_user',
+        'permission_callback' => '__return_true',
+    ]);
+    register_rest_route('truyenaudio/v1', '/upgrade-author', [
+        'methods' => 'POST',
+        'callback' => 'ta_rest_upgrade_author',
+        'permission_callback' => 'is_user_logged_in',
+    ]);
+    register_rest_route('truyenaudio/v1', '/author-stats', [
+        'methods' => 'GET',
+        'callback' => 'ta_rest_author_stats',
+        'permission_callback' => 'is_user_logged_in',
+    ]);
+    register_rest_route('truyenaudio/v1', '/purchase-vip', [
+        'methods' => 'POST',
+        'callback' => 'ta_rest_purchase_vip',
+        'permission_callback' => 'is_user_logged_in',
+    ]);
+});
+
+function ta_register_user($request) {
+    $username = sanitize_user($request->get_param('username'));
+    $email = sanitize_email($request->get_param('email'));
+    $password = $request->get_param('password');
+
+    if (empty($username) || empty($email) || empty($password)) {
+        return new WP_Error('missing_fields', 'Vui lòng điền đầy đủ thông tin', ['status' => 400]);
+    }
+    if (username_exists($username)) {
+        return new WP_Error('username_exists', 'Tên đăng nhập đã tồn tại', ['status' => 400]);
+    }
+    if (email_exists($email)) {
+        return new WP_Error('email_exists', 'Email đã tồn tại', ['status' => 400]);
+    }
+
+    $user_id = wp_insert_user([
+        'user_login' => $username,
+        'user_email' => $email,
+        'user_pass'  => $password,
+        'role'       => 'subscriber',
+    ]);
+
+    if (is_wp_error($user_id)) {
+        return new WP_Error('registration_failed', 'Đăng ký thất bại', ['status' => 500]);
+    }
+
+    return new WP_REST_Response(['message' => 'Đăng ký thành công', 'user_id' => $user_id], 201);
+}
+
+function ta_rest_upgrade_author() {
+    $user_id = get_current_user_id();
+    $user = get_userdata($user_id);
+
+    if (in_array('tac_gia_role', (array) $user->roles)) {
+        return new WP_Error('already_author', 'Bạn đã là tác giả', ['status' => 400]);
+    }
+    if (in_array('administrator', (array) $user->roles)) {
+        return new WP_Error('is_admin', 'Admin không cần nâng cấp', ['status' => 400]);
+    }
+
+    $user->set_role('tac_gia_role');
+    ta_set_flash('success', '✍️ Chúc mừng bạn đã trở thành tác giả!');
+    return new WP_REST_Response(['message' => 'Chúc mừng bạn đã trở thành tác giả!', 'role' => 'tac_gia_role']);
+}
+
+function ta_rest_author_stats() {
+    $user_id = get_current_user_id();
+    if (!in_array('tac_gia_role', (array) get_userdata($user_id)->roles) && !current_user_can('administrator')) {
+        return new WP_Error('not_author', 'Bạn không phải tác giả', ['status' => 403]);
+    }
+
+    $stories = get_posts([
+        'post_type' => 'truyen',
+        'author' => $user_id,
+        'numberposts' => -1,
+    ]);
+
+    $total_views = 0;
+    $total_revenue = 0;
+    $total_chapters = 0;
+    $story_data = [];
+
+    foreach ($stories as $s) {
+        $views = get_post_meta($s->ID, '_views', true) ?: 0;
+        $revenue = get_post_meta($s->ID, '_story_revenue', true) ?: 0;
+        $chapters = ta_get_chapters($s->ID);
+        $total_views += $views;
+        $total_revenue += $revenue;
+        $total_chapters += count($chapters);
+        $story_data[] = [
+            'id' => $s->ID,
+            'title' => $s->post_title,
+            'views' => $views,
+            'revenue' => $revenue,
+            'chapters' => count($chapters),
+            'url' => get_permalink($s->ID),
+        ];
+    }
+
+    $balance = get_user_meta($user_id, '_linh_thach', true) ?: 0;
+    $earnings = get_user_meta($user_id, '_author_earnings', true) ?: 0;
+    $withdrawn = get_user_meta($user_id, '_author_withdrawn', true) ?: 0;
+
+    return new WP_REST_Response([
+        'stories' => count($stories),
+        'total_views' => $total_views,
+        'total_revenue' => $total_revenue,
+        'total_chapters' => $total_chapters,
+        'balance' => $balance,
+        'earnings' => $earnings,
+        'withdrawn' => $withdrawn,
+        'available' => $balance - $withdrawn,
+        'story_list' => $story_data,
+    ]);
+}
+
+function ta_rest_purchase_vip($request) {
+    $user_id = get_current_user_id();
+    $chapter_id = intval($request->get_param('chapter_id'));
+    $chapter = get_post($chapter_id);
+
+    if (!$chapter || $chapter->post_type !== 'chapter') {
+        return new WP_Error('invalid', 'Không tìm thấy chương', ['status' => 404]);
+    }
+
+    $story_id = get_post_meta($chapter_id, '_story_id', true);
+    $is_vip = get_post_meta($chapter_id, '_is_vip', true);
+    $vip_price = get_post_meta($chapter_id, '_vip_price', true) ?: 5;
+
+    if (!$is_vip) {
+        return new WP_Error('not_vip', 'Chương này không phải VIP', ['status' => 400]);
+    }
+
+    $purchased = get_user_meta($user_id, '_purchased_chapters', true) ?: [];
+    if (in_array($chapter_id, $purchased)) {
+        return new WP_Error('already_purchased', 'Bạn đã mua chương này rồi', ['status' => 400]);
+    }
+
+    $lt = get_user_meta($user_id, '_linh_thach', true) ?: 0;
+    if ($lt < $vip_price) {
+        return new WP_Error('insufficient', 'Không đủ Linh Thạch', ['status' => 400]);
+    }
+
+    $new_lt = $lt - $vip_price;
+    update_user_meta($user_id, '_linh_thach', $new_lt);
+
+    $purchased[] = $chapter_id;
+    update_user_meta($user_id, '_purchased_chapters', $purchased);
+
+    $revenue = get_post_meta($story_id, '_story_revenue', true) ?: 0;
+    $revenue += $vip_price;
+    update_post_meta($story_id, '_story_revenue', $revenue);
+
+    $rate = get_option('ta_revenue_rate', 15);
+    $author_profit = round(($vip_price * $rate) / 100);
+    if ($author_profit > 0) {
+        $author_id = get_post_field('post_author', $story_id);
+        if ($author_id) {
+            $author_earnings = get_user_meta($author_id, '_author_earnings', true) ?: 0;
+            $author_earnings += $author_profit;
+            update_user_meta($author_id, '_author_earnings', $author_earnings);
+
+            $author_lt = get_user_meta($author_id, '_linh_thach', true) ?: 0;
+            $author_lt += $author_profit;
+            update_user_meta($author_id, '_linh_thach', $author_lt);
+        }
+    }
+
+    return new WP_REST_Response([
+        'message' => 'Mua thành công!',
+        'new_balance' => $new_lt,
+    ]);
+}
+
+// Check if user has purchased a chapter
+function ta_has_purchased($chapter_id, $user_id = null) {
+    if (!$user_id) $user_id = get_current_user_id();
+    if (!$user_id) return false;
+    if (current_user_can('administrator')) return true;
+    $purchased = get_user_meta($user_id, '_purchased_chapters', true) ?: [];
+    return in_array($chapter_id, $purchased);
+}
+
+// Get user role badge
+function ta_user_role_badge($user_id = null) {
+    if (!$user_id) $user_id = get_current_user_id();
+    if (!$user_id) return '';
+    $user = get_userdata($user_id);
+    if (in_array('administrator', (array) $user->roles)) return '<span class="role-badge admin">Admin</span>';
+    if (in_array('tac_gia_role', (array) $user->roles)) return '<span class="role-badge author">Tác giả</span>';
+    return '<span class="role-badge user">User</span>';
+}
+
+// ==================== 403 ACCESS DENIED ====================
+function ta_deny() {
+    status_header(403);
+    ?>
+    <!DOCTYPE html><html><head><meta charset="UTF-8"><title>403 - Truy cập bị từ chối</title>
+    <style>
+        body { margin:0; padding:0; font-family:-apple-system,sans-serif; background:#0f0f1a; color:#e0e0e0; display:flex; align-items:center; justify-content:center; min-height:100vh; }
+        .deny-box { text-align:center; padding:40px; }
+        .deny-code { font-size:80px; font-weight:800; color:#e74c3c; line-height:1; }
+        .deny-title { font-size:24px; margin:15px 0; color:#fff; }
+        .deny-desc { color:#888; margin-bottom:25px; }
+        .deny-btn { display:inline-block; padding:10px 30px; background:#f0c040; color:#1a1a2e; border-radius:8px; text-decoration:none; font-weight:600; }
+        .deny-btn:hover { background:#ffd700; }
+    </style></head><body>
+    <div class="deny-box">
+        <div class="deny-code">403</div>
+        <div class="deny-title">🔒 Truy cập bị từ chối</div>
+        <div class="deny-desc">Bạn không có quyền truy cập vào trang này.</div>
+        <a class="deny-btn" href="<?php echo esc_url(home_url()); ?>">Về trang chủ</a>
+    </div></body></html>
+    <?php
+    exit;
+}
+
+function ta_require_auth() {
+    if (!is_user_logged_in()) ta_deny();
+}
+
+function ta_require_role($roles) {
+    ta_require_auth();
+    $user = wp_get_current_user();
+    if (!array_intersect((array)$roles, (array)$user->roles)) ta_deny();
+}
+
+// ==================== BLOCK AUTHOR FROM WP ADMIN ====================
+add_action('admin_init', 'ta_block_admin_from_author');
+function ta_block_admin_from_author() {
+    if (defined('DOING_AJAX') && DOING_AJAX) return;
+    if (!is_user_logged_in()) return;
+    $user = wp_get_current_user();
+    if (in_array('tac_gia_role', (array) $user->roles)) {
+        // Allow post editing pages (post.php, post-new.php)
+        global $pagenow;
+        $allowed = ['post.php', 'post-new.php', 'admin-ajax.php', 'upload.php', 'media-new.php', 'async-upload.php'];
+        if (in_array($pagenow, $allowed)) return;
+        wp_redirect(home_url('/tac-gia-dashboard'));
+        exit;
+    }
+}
+
+add_action('wp_logout', 'ta_redirect_after_logout');
+function ta_redirect_after_logout() {
+    wp_redirect(home_url());
+    exit;
+}
+
+// ==================== FLASH MESSAGES ====================
+function ta_set_flash($type, $message) {
+    $messages = get_transient('ta_flash_' . get_current_user_id()) ?: [];
+    $messages[] = ['type' => $type, 'message' => $message];
+    set_transient('ta_flash_' . get_current_user_id(), $messages, 60);
+}
+
+function ta_get_flash() {
+    $user_id = get_current_user_id();
+    if (!$user_id) return [];
+    $messages = get_transient('ta_flash_' . $user_id) ?: [];
+    delete_transient('ta_flash_' . $user_id);
+    return $messages;
+}
+
+// ==================== NOTIFICATION SYSTEM ====================
+function ta_add_notification($user_id, $type, $message, $link = '') {
+    $notifications = get_user_meta($user_id, '_notifications', true) ?: [];
+    array_unshift($notifications, [
+        'type' => $type,
+        'message' => $message,
+        'link' => $link,
+        'time' => current_time('mysql'),
+        'read' => 0,
+    ]);
+    // Keep max 50
+    if (count($notifications) > 50) $notifications = array_slice($notifications, 0, 50);
+    update_user_meta($user_id, '_notifications', $notifications);
+}
+
+function ta_get_notifications($user_id = null, $unread_only = false) {
+    if (!$user_id) $user_id = get_current_user_id();
+    if (!$user_id) return [];
+    $notifications = get_user_meta($user_id, '_notifications', true) ?: [];
+    if ($unread_only) {
+        $notifications = array_filter($notifications, function($n) { return empty($n['read']); });
+    }
+    return $notifications;
+}
+
+function ta_count_unread_notifications($user_id = null) {
+    return count(ta_get_notifications($user_id, true));
+}
+
+// Login welcome notification
+add_action('wp_login', 'ta_login_notification', 10, 2);
+function ta_login_notification($user_login, $user) {
+    ta_add_notification($user->ID, 'info', '👋 Chào mừng bạn quay trở lại!', home_url());
+}
+
+// ==================== OTP VERIFICATION ====================
+function ta_validate_password($password) {
+    if (strlen($password) < 8) return false;
+    if (!preg_match('/[A-Z]/', $password)) return false;
+    if (!preg_match('/[a-z]/', $password)) return false;
+    if (!preg_match('/[0-9]/', $password)) return false;
+    if (!preg_match('/[^A-Za-z0-9]/', $password)) return false;
+    return true;
+}
+
+function ta_generate_otp($length = 6) {
+    return str_pad(random_int(0, pow(10, $length) - 1), $length, '0', STR_PAD_LEFT);
+}
+
+function ta_send_otp_email($user_id, $email, $otp) {
+    $subject = 'Mã xác thực đăng ký TruyenAudio';
+    $message = "Chào bạn,\n\n";
+    $message .= "Mã xác thực của bạn là: $otp\n\n";
+    $message .= "Mã có hiệu lực trong 10 phút.\n\n";
+    $message .= "Cảm ơn bạn đã đăng ký!\n";
+    $message .= get_bloginfo('name');
+    wp_mail($email, $subject, $message);
+}
+
+add_action('wp_ajax_nopriv_ta_verify_otp', 'ta_ajax_verify_otp');
+function ta_ajax_verify_otp() {
+    $user_id = intval($_POST['user_id'] ?? 0);
+    $otp = preg_replace('/[^0-9]/', '', $_POST['otp'] ?? '');
+
+    if (!$user_id || !$otp) {
+        wp_send_json_error('Thiếu thông tin xác thực.');
+    }
+
+    $stored = get_user_meta($user_id, '_email_otp', true);
+    $expires = intval(get_user_meta($user_id, '_email_otp_expires', true));
+    $verified = get_user_meta($user_id, '_email_verified', true);
+
+    if ($verified === '1') {
+        wp_send_json_error('Tài khoản này đã được xác thực rồi.');
+    }
+
+    if (time() > $expires) {
+        wp_send_json_error('Mã xác thực đã hết hạn. Vui lòng đăng ký lại.');
+    }
+
+    if ($stored !== $otp) {
+        wp_send_json_error('Mã xác thực không đúng.');
+    }
+
+    update_user_meta($user_id, '_email_verified', '1');
+    delete_user_meta($user_id, '_email_otp');
+    delete_user_meta($user_id, '_email_otp_expires');
+
+    // Auto-login
+    wp_set_current_user($user_id);
+    wp_set_auth_cookie($user_id);
+
+    wp_send_json_success(['message' => '✅ Xác thực thành công!']);
+}
+
+add_action('wp_ajax_nopriv_ta_resend_otp', 'ta_ajax_resend_otp');
+function ta_ajax_resend_otp() {
+    $user_id = intval($_POST['user_id'] ?? 0);
+    if (!$user_id) wp_send_json_error('Thiếu thông tin.');
+
+    $user = get_userdata($user_id);
+    if (!$user) wp_send_json_error('Người dùng không tồn tại.');
+
+    if (get_user_meta($user_id, '_email_verified', true) === '1') {
+        wp_send_json_error('Tài khoản đã được xác thực.');
+    }
+
+    $otp = ta_generate_otp();
+    update_user_meta($user_id, '_email_otp', $otp);
+    update_user_meta($user_id, '_email_otp_expires', time() + 600);
+    ta_send_otp_email($user_id, $user->user_email, $otp);
+
+    wp_send_json_success(['message' => '📧 Mã xác thực mới đã được gửi tới email của bạn.']);
+}
+
+// ==================== FORGOT / RESET PASSWORD ====================
+add_action('wp_ajax_nopriv_ta_forgot_password', 'ta_ajax_forgot_password');
+function ta_ajax_forgot_password() {
+    $email = sanitize_email($_POST['email'] ?? '');
+    if (!$email) wp_send_json_error('Vui lòng nhập email.');
+
+    $user = get_user_by('email', $email);
+    if (!$user) wp_send_json_error('Email này chưa được đăng ký.');
+
+    // Check if user has email verified
+    if (get_user_meta($user->ID, '_email_verified', true) !== '1') {
+        wp_send_json_error('Email này chưa được xác thực. Vui lòng xác thực email trước.');
+    }
+
+    $otp = ta_generate_otp();
+    update_user_meta($user->ID, '_reset_otp', $otp);
+    update_user_meta($user->ID, '_reset_otp_expires', time() + 600);
+
+    $subject = 'Đặt lại mật khẩu TruyenAudio';
+    $message = "Chào " . $user->display_name . ",\n\n";
+    $message .= "Mã xác thực đặt lại mật khẩu của bạn là: $otp\n\n";
+    $message .= "Mã có hiệu lực trong 10 phút.\n\n";
+    $message .= "Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.\n\n";
+    $message .= get_bloginfo('name');
+    wp_mail($email, $subject, $message);
+
+    wp_send_json_success([
+        'user_id' => $user->ID,
+        'message' => '📧 Mã xác thực đã được gửi tới email ' . $email . '. Vui lòng kiểm tra!',
+    ]);
+}
+
+add_action('wp_ajax_nopriv_ta_reset_password', 'ta_ajax_reset_password');
+function ta_ajax_reset_password() {
+    $user_id = intval($_POST['user_id'] ?? 0);
+    $otp = preg_replace('/[^0-9]/', '', $_POST['otp'] ?? '');
+    $password = $_POST['password'] ?? '';
+
+    if (!$user_id || !$otp || !$password) {
+        wp_send_json_error('Thiếu thông tin.');
+    }
+    if (!ta_validate_password($password)) {
+        wp_send_json_error('Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt.');
+    }
+
+    $stored = get_user_meta($user_id, '_reset_otp', true);
+    $expires = intval(get_user_meta($user_id, '_reset_otp_expires', true));
+
+    if (time() > $expires) {
+        wp_send_json_error('Mã xác thực đã hết hạn. Vui lòng yêu cầu lại.');
+    }
+    if ($stored !== $otp) {
+        wp_send_json_error('Mã xác thực không đúng.');
+    }
+
+    wp_set_password($password, $user_id);
+    delete_user_meta($user_id, '_reset_otp');
+    delete_user_meta($user_id, '_reset_otp_expires');
+
+    wp_send_json_success(['message' => '✅ Mật khẩu đã được đặt lại thành công! Vui lòng đăng nhập.']);
+}
+
+// AJAX: fetch notifications
+add_action('wp_ajax_ta_get_notifications', 'ta_ajax_get_notifications');
+function ta_ajax_get_notifications() {
+    $user_id = get_current_user_id();
+    if (!$user_id) wp_send_json_error('Vui lòng đăng nhập');
+
+    $unread_count = ta_count_unread_notifications($user_id);
+    $list = ta_get_notifications($user_id, false);
+
+    // Mark all as read
+    $notifications = get_user_meta($user_id, '_notifications', true) ?: [];
+    foreach ($notifications as &$n) $n['read'] = 1;
+    update_user_meta($user_id, '_notifications', $notifications);
+
+    // Format for display
+    $items = [];
+    foreach ($list as $n) {
+        $items[] = [
+            'type' => $n['type'],
+            'message' => $n['message'],
+            'link' => $n['link'],
+            'time' => $n['time'],
+            'is_new' => empty($n['read']),
+        ];
+    }
+
+    wp_send_json_success([
+        'unread' => $unread_count,
+        'items' => $items,
+    ]);
+}
+
+// Hook into withdrawal approval/rejection
+add_action('ta_withdrawal_processed', 'ta_notify_withdrawal', 10, 3);
+function ta_notify_withdrawal($user_id, $status, $amount) {
+    if ($status === 'approved') {
+        ta_add_notification($user_id, 'success', '✅ Yêu cầu rút ' . number_format($amount) . ' Linh Thạch đã được duyệt!', home_url('/rut-linh-thach'));
+    } elseif ($status === 'rejected') {
+        ta_add_notification($user_id, 'error', '❌ Yêu cầu rút ' . number_format($amount) . ' Linh Thạch đã bị từ chối.', home_url('/rut-linh-thach'));
+    }
+}
+
+// Hook into report status change
+add_action('ta_report_processed', 'ta_notify_report', 10, 3);
+function ta_notify_report($story_id, $reporter_id, $status) {
+    $story_title = get_the_title($story_id);
+    $story_link = get_permalink($story_id);
+
+    if ($status === 'resolved') {
+        ta_add_notification($reporter_id, 'success', '✅ Báo cáo truyện "' . $story_title . '" đã được xử lý. Cảm ơn bạn!', $story_link);
+    } elseif ($status === 'dismissed') {
+        ta_add_notification($reporter_id, 'info', 'ℹ️ Báo cáo truyện "' . $story_title . '" đã được xem xét và không có vi phạm.', $story_link);
+    }
+
+    // Also notify the story author
+    $author_id = get_post_field('post_author', $story_id);
+    if ($author_id && $author_id != $reporter_id) {
+        if ($status === 'resolved') {
+            ta_add_notification($author_id, 'warning', '⚠️ Truyện "' . $story_title . '" của bạn đã bị báo cáo và admin đã xác nhận vi phạm. Vui lòng kiểm tra lại nội dung!', $story_link);
+        } elseif ($status === 'dismissed') {
+            ta_add_notification($author_id, 'success', '✅ Báo cáo về truyện "' . $story_title . '" đã được xem xét và không có vi phạm. Cảm ơn bạn!', $story_link);
+        }
+    }
+}
+
+// Override withdrawal approval/rejection to fire hooks
+add_action('wp_ajax_ta_approve_withdrawal', 'ta_approve_withdrawal');
+function ta_approve_withdrawal() {
+    if (!current_user_can('administrator')) wp_die('Unauthorized');
+    if (!wp_verify_nonce($_GET['_wpnonce'], 'ta_withdrawal_nonce')) wp_die('Invalid nonce');
+
+    $user_id = intval($_GET['user_id']);
+    $index = intval($_GET['index']);
+    $requests = get_user_meta($user_id, '_withdrawal_requests', true) ?: [];
+
+    if (!isset($requests[$index]) || $requests[$index]['status'] != 'pending') {
+        wp_die('Invalid request');
+    }
+
+    $amount = $requests[$index]['amount'];
+    $requests[$index]['status'] = 'approved';
+    $requests[$index]['approved_time'] = current_time('mysql');
+
+    $withdrawn = get_user_meta($user_id, '_author_withdrawn', true) ?: 0;
+    $withdrawn += $amount;
+    update_user_meta($user_id, '_author_withdrawn', $withdrawn);
+
+    $balance = get_user_meta($user_id, '_linh_thach', true) ?: 0;
+    $balance -= $amount;
+    if ($balance < 0) $balance = 0;
+    update_user_meta($user_id, '_linh_thach', $balance);
+
+    update_user_meta($user_id, '_withdrawal_requests', $requests);
+
+    $history = get_user_meta($user_id, '_lt_history', true) ?: [];
+    $history[] = [
+        'type' => 'withdrawal',
+        'amount' => -$amount,
+        'fee' => $requests[$index]['fee'],
+        'net' => $requests[$index]['net'],
+        'method' => $requests[$index]['method'],
+        'note' => 'Rút tiền: ' . number_format($amount) . ' LT (phí ' . $requests[$index]['fee_pct'] . '%)',
+        'time' => current_time('mysql'),
+    ];
+    update_user_meta($user_id, '_lt_history', $history);
+
+    do_action('ta_withdrawal_processed', $user_id, 'approved', $amount);
+
+    wp_redirect(admin_url('admin.php?page=truyenaudio-withdrawals&approved=1'));
+    exit;
+}
+
+add_action('wp_ajax_ta_reject_withdrawal', 'ta_reject_withdrawal');
+function ta_reject_withdrawal() {
+    if (!current_user_can('administrator')) wp_die('Unauthorized');
+    if (!wp_verify_nonce($_GET['_wpnonce'], 'ta_withdrawal_nonce')) wp_die('Invalid nonce');
+
+    $user_id = intval($_GET['user_id']);
+    $index = intval($_GET['index']);
+    $requests = get_user_meta($user_id, '_withdrawal_requests', true) ?: [];
+
+    if (!isset($requests[$index]) || $requests[$index]['status'] != 'pending') {
+        wp_die('Invalid request');
+    }
+
+    $amount = $requests[$index]['amount'];
+    $requests[$index]['status'] = 'rejected';
+    $requests[$index]['rejected_time'] = current_time('mysql');
+    update_user_meta($user_id, '_withdrawal_requests', $requests);
+
+    do_action('ta_withdrawal_processed', $user_id, 'rejected', $amount);
+
+    wp_redirect(admin_url('admin.php?page=truyenaudio-withdrawals&rejected=1'));
+    exit;
+}
+
+// Hook report status change to fire notification
+add_action('save_post', 'ta_report_status_change', 20, 3);
+function ta_report_status_change($post_id, $post, $update) {
+    if ($post->post_type !== 'report') return;
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+    if (wp_is_post_revision($post_id)) return;
+
+    $old_status = get_post_meta($post_id, '_report_status_prev', true) ?: 'pending';
+    $new_status = get_post_meta($post_id, '_report_status', true) ?: 'pending';
+
+    update_post_meta($post_id, '_report_status_prev', $new_status);
+
+    if ($old_status === $new_status) return;
+    if ($old_status === 'pending' && in_array($new_status, ['resolved', 'dismissed'])) {
+        $story_id = get_post_meta($post_id, '_reported_story_id', true);
+        $reporter_id = get_post_meta($post_id, '_reporter_id', true);
+        if ($story_id && $reporter_id) {
+            do_action('ta_report_processed', $story_id, $reporter_id, $new_status);
+        }
+
+        // Auto-ban story when report is resolved (confirmed violation)
+        if ($new_status === 'resolved' && $story_id) {
+            $story = get_post($story_id);
+            if ($story && $story->post_type === 'truyen' && $story->post_status !== 'draft') {
+                $author_id = $story->post_author;
+                wp_update_post(['ID' => $story_id, 'post_status' => 'draft']);
+                update_post_meta($story_id, '_banned', '1');
+                update_post_meta($story_id, '_ban_reason', 'Vi phạm: ' . get_post_meta($post_id, '_report_reason', true));
+                update_post_meta($story_id, '_ban_time', current_time('mysql'));
+
+                // Notify story author
+                ta_add_notification($author_id, 'error', '🚫 Truyện "' . $story->post_title . '" đã bị khóa do vi phạm. Vui lòng kiểm tra và liên hệ admin.', get_permalink($story_id));
+            }
+        }
+    }
+}
+
+// Add ban meta box to story edit screen
+add_action('add_meta_boxes', 'ta_add_ban_meta_box');
+function ta_add_ban_meta_box() {
+    add_meta_box('story_ban_box', '🚫 Khóa truyện', 'ta_ban_meta_html', 'truyen', 'side');
+}
+
+function ta_ban_meta_html($post) {
+    $banned = get_post_meta($post->ID, '_banned', true);
+    $reason = get_post_meta($post->ID, '_ban_reason', true);
+    $ban_time = get_post_meta($post->ID, '_ban_time', true);
+    $pending_reports = count(get_posts([
+        'post_type' => 'report',
+        'meta_query' => [
+            ['key' => '_reported_story_id', 'value' => $post->ID],
+            ['key' => '_report_status', 'value' => 'pending'],
+        ],
+        'numberposts' => -1,
+        'fields' => 'ids',
+    ]));
+    ?>
+    <?php if ($banned): ?>
+        <p style="color:#e74c3c;font-weight:600;">🚫 Truyện này đang bị khóa</p>
+        <p style="font-size:13px;color:#888;">Lý do: <?php echo esc_html($reason ?: 'N/A'); ?></p>
+        <p style="font-size:13px;color:#888;">Thời gian: <?php echo $ban_time ?: 'N/A'; ?></p>
+        <p><label><input type="checkbox" name="unban_story" value="1"> Mở khóa truyện</label></p>
+    <?php else: ?>
+        <p style="color:#2ecc71;">✅ Truyện đang hoạt động</p>
+        <p style="font-size:13px;color:#888;">Số báo cáo đang chờ: <strong><?php echo $pending_reports; ?></strong></p>
+        <p><label><input type="checkbox" name="ban_story" value="1"> Khóa truyện</label></p>
+        <p style="font-size:13px;color:#888;"><input type="text" name="ban_reason" placeholder="Lý do khóa..." style="width:100%;"></p>
+    <?php endif; ?>
+    <?php
+}
+
+add_action('save_post', 'ta_save_ban_meta', 20);
+function ta_save_ban_meta($post_id) {
+    if (get_post_type($post_id) !== 'truyen') return;
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+
+    $banned = get_post_meta($post_id, '_banned', true);
+
+    if (isset($_POST['unban_story']) && $banned) {
+        delete_post_meta($post_id, '_banned');
+        delete_post_meta($post_id, '_ban_reason');
+        delete_post_meta($post_id, '_ban_time');
+        wp_update_post(['ID' => $post_id, 'post_status' => 'publish']);
+    }
+
+    if (isset($_POST['ban_story']) && !$banned) {
+        $reason = sanitize_text_field($_POST['ban_reason'] ?? 'Vi phạm quy định');
+        wp_update_post(['ID' => $post_id, 'post_status' => 'draft']);
+        update_post_meta($post_id, '_banned', '1');
+        update_post_meta($post_id, '_ban_reason', $reason);
+        update_post_meta($post_id, '_ban_time', current_time('mysql'));
+
+        $author_id = get_post_field('post_author', $post_id);
+        $title = get_the_title($post_id);
+        ta_add_notification($author_id, 'error', '🚫 Truyện "' . $title . '" đã bị khóa bởi admin. Lý do: ' . $reason, get_permalink($post_id));
+    }
+}
+
+// ==================== LT ORDER / PAYMENT SYSTEM ====================
+add_action('init', 'ta_register_lt_order');
+function ta_register_lt_order() {
+    register_post_type('lt_order', [
+    'labels' => ['name' => 'Đơn nạp LT', 'singular_name' => 'Đơn nạp'],
+    'public' => false,
+    'show_ui' => true,
+    'show_in_menu' => 'edit.php?post_type=truyen',
+    'supports' => ['title'],
+    'capability_type' => 'post',
+    'map_meta_cap' => true,
+    'rewrite' => false,
+    'exclude_from_search' => true,
+    'publicly_queryable' => false,
+    'has_archive' => false,
+    'query_var' => false,
+    ]);
+}
+
+add_action('add_meta_boxes', 'ta_add_lt_order_meta');
+function ta_add_lt_order_meta() {
+    add_meta_box('lt_order_details', 'Chi tiết đơn nạp', 'ta_lt_order_meta_html', 'lt_order', 'normal');
+}
+
+function ta_lt_order_meta_html($post) {
+    $user_id = get_post_meta($post->ID, '_order_user_id', true);
+    $lt_amount = get_post_meta($post->ID, '_order_lt', true);
+    $vnd_amount = get_post_meta($post->ID, '_order_vnd', true);
+    $status = get_post_meta($post->ID, '_order_status', true) ?: 'pending';
+    $user = $user_id ? get_userdata($user_id) : null;
+    ?>
+    <p><strong>Người dùng:</strong> <?php echo $user ? $user->display_name . ' (' . $user->user_login . ')' : 'N/A'; ?></p>
+    <p><strong>Linh Thạch:</strong> 💎<?php echo number_format($lt_amount); ?></p>
+    <p><strong>Số tiền:</strong> <?php echo number_format($vnd_amount); ?>₫</p>
+    <p><strong>Trạng thái:</strong>
+        <select name="order_status">
+            <option value="pending" <?php selected($status, 'pending'); ?>>⏳ Chờ thanh toán</option>
+            <option value="completed" <?php selected($status, 'completed'); ?>>✅ Hoàn thành</option>
+            <option value="cancelled" <?php selected($status, 'cancelled'); ?>>❌ Đã hủy</option>
+        </select>
+    </p>
+    <?php if ($status === 'pending'): ?>
+    <p style="color:#f39c12;">🔔 Đang chờ xử lý. Chọn "Hoàn thành" và lưu để cộng LT cho người dùng.</p>
+    <?php endif; ?>
+    <?php
+}
+
+add_action('save_post', 'ta_save_lt_order_meta');
+function ta_save_lt_order_meta($post_id) {
+    if (get_post_type($post_id) !== 'lt_order') return;
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
+    if (isset($_POST['order_status'])) {
+        $old_status = get_post_meta($post_id, '_order_status', true) ?: 'pending';
+        $new_status = sanitize_text_field($_POST['order_status']);
+        update_post_meta($post_id, '_order_status', $new_status);
+        if ($old_status !== 'completed' && $new_status === 'completed') {
+            $user_id = get_post_meta($post_id, '_order_user_id', true);
+            $lt = floatval(get_post_meta($post_id, '_order_lt', true));
+            if ($user_id && $lt > 0) {
+                $current = get_user_meta($user_id, '_linh_thach', true) ?: 0;
+                update_user_meta($user_id, '_linh_thach', $current + $lt);
+                $order_code = get_the_title($post_id);
+                $note = 'Nạp LT: ' . $order_code . ' (+' . $lt . ' LT)';
+                // Add to revenue for author commission if needed
+                // Log to user history
+                $history = get_user_meta($user_id, '_lt_history', true) ?: [];
+                $history[] = ['type' => 'deposit', 'amount' => $lt, 'note' => $note, 'time' => current_time('mysql')];
+                update_user_meta($user_id, '_lt_history', $history);
+            }
+        }
+    }
+}
+
+add_action('manage_lt_order_posts_custom_column', 'ta_lt_order_columns_content', 10, 2);
+add_filter('manage_lt_order_posts_columns', 'ta_lt_order_columns');
+function ta_lt_order_columns($columns) {
+    $columns['lt_user'] = 'Người dùng';
+    $columns['lt_lt'] = 'Linh Thạch';
+    $columns['lt_vnd'] = 'Số tiền';
+    $columns['lt_status'] = 'Trạng thái';
+    unset($columns['date']);
+    return $columns;
+}
+function ta_lt_order_columns_content($column, $post_id) {
+    if ($column === 'lt_user') {
+        $uid = get_post_meta($post_id, '_order_user_id', true);
+        $u = $uid ? get_userdata($uid) : null;
+        echo $u ? esc_html($u->display_name) : 'N/A';
+    }
+    if ($column === 'lt_lt') {
+        echo '💎' . number_format(intval(get_post_meta($post_id, '_order_lt', true)));
+    }
+    if ($column === 'lt_vnd') {
+        echo number_format(intval(get_post_meta($post_id, '_order_vnd', true))) . '₫';
+    }
+    if ($column === 'lt_status') {
+        $s = get_post_meta($post_id, '_order_status', true) ?: 'pending';
+        $labels = ['pending' => '⏳ Chờ', 'completed' => '✅ Xong', 'cancelled' => '❌ Hủy'];
+        echo $labels[$s] ?? $s;
+    }
+}
+
+// Filter orders by user
+add_action('restrict_manage_posts', 'ta_lt_order_user_filter');
+function ta_lt_order_user_filter() {
+    global $typenow;
+    if ($typenow !== 'lt_order') return;
+    $users = get_users(['number' => 50]);
+    $selected = isset($_GET['user_id']) ? intval($_GET['user_id']) : '';
+    echo '<select name="user_id"><option value="">Tất cả người dùng</option>';
+    foreach ($users as $u) {
+        printf('<option value="%d" %s>%s</option>', $u->ID, selected($selected, $u->ID, false), esc_html($u->display_name));
+    }
+    echo '</select>';
+}
+add_filter('parse_query', 'ta_lt_order_user_filter_query');
+function ta_lt_order_user_filter_query($query) {
+    global $pagenow, $typenow;
+    if ($pagenow !== 'edit.php' || $typenow !== 'lt_order') return;
+    if (isset($_GET['user_id']) && !empty($_GET['user_id'])) {
+        $query->query_vars['meta_key'] = '_order_user_id';
+        $query->query_vars['meta_value'] = intval($_GET['user_id']);
+    }
+}
+
+// AJAX: Create LT order
+add_action('wp_ajax_create_lt_order', 'ta_ajax_create_lt_order');
+function ta_ajax_create_lt_order() {
+    if (!is_user_logged_in()) wp_send_json_error('Vui lòng đăng nhập.');
+
+    $package_id = sanitize_text_field($_POST['package_id'] ?? '');
+    $packages = get_option('ta_lt_packages', []);
+    $pkg = null;
+    foreach ($packages as $p) {
+        if ($p['id'] === $package_id) { $pkg = $p; break; }
+    }
+    if (!$pkg) wp_send_json_error('Gói nạp không hợp lệ.');
+
+    $user_id = get_current_user_id();
+    $lt = intval($pkg['lt']);
+    $vnd = intval($pkg['vnd']);
+
+    $order_code = 'LT' . date('ymd') . '-' . strtoupper(wp_generate_password(6, false));
+    $order_id = wp_insert_post([
+        'post_title' => $order_code,
+        'post_type' => 'lt_order',
+        'post_status' => 'publish',
+        'post_author' => $user_id,
+    ]);
+    if (is_wp_error($order_id)) wp_send_json_error('Lỗi tạo đơn.');
+
+    update_post_meta($order_id, '_order_user_id', $user_id);
+    update_post_meta($order_id, '_order_lt', $lt);
+    update_post_meta($order_id, '_order_vnd', $vnd);
+    update_post_meta($order_id, '_order_status', 'pending');
+    update_post_meta($order_id, '_order_package_id', $package_id);
+
+    wp_send_json_success([
+        'order_id' => $order_id,
+        'order_code' => $order_code,
+        'lt' => $lt,
+        'vnd' => $vnd,
+        'message' => 'Đã tạo đơn nạp ' . number_format($lt) . ' LT thành công!',
+    ]);
+}
+
+// AJAX: Confirm payment (test mode — auto credit)
+add_action('wp_ajax_confirm_lt_payment', 'ta_ajax_confirm_lt_payment');
+function ta_ajax_confirm_lt_payment() {
+    if (!is_user_logged_in()) wp_send_json_error('Vui lòng đăng nhập.');
+
+    $order_id = intval($_POST['order_id'] ?? 0);
+    if (!$order_id) wp_send_json_error('Mã đơn không hợp lệ.');
+
+    $order = get_post($order_id);
+    if (!$order || $order->post_type !== 'lt_order') wp_send_json_error('Đơn không tồn tại.');
+    if (intval(get_post_meta($order_id, '_order_user_id', true)) !== get_current_user_id())
+        wp_send_json_error('Không phải đơn của bạn.');
+
+    $status = get_post_meta($order_id, '_order_status', true);
+    if ($status !== 'pending') wp_send_json_error('Đơn này đã xử lý rồi.');
+
+    // Test mode: auto-approve
+    $lt = floatval(get_post_meta($order_id, '_order_lt', true));
+    $user_id = get_current_user_id();
+    $current = get_user_meta($user_id, '_linh_thach', true) ?: 0;
+    update_user_meta($user_id, '_linh_thach', $current + $lt);
+    update_post_meta($order_id, '_order_status', 'completed');
+
+    $history = get_user_meta($user_id, '_lt_history', true) ?: [];
+    $history[] = ['type' => 'deposit', 'amount' => $lt, 'note' => 'Nạp LT: ' . get_the_title($order_id), 'time' => current_time('mysql')];
+    update_user_meta($user_id, '_lt_history', $history);
+
+    wp_send_json_success([
+        'message' => '💎 Nạp thành công! Bạn nhận được ' . number_format($lt) . ' Linh Thạch.',
+        'new_balance' => $current + $lt,
+    ]);
+}
+
+register_activation_hook(__FILE__, function() {
+    ta_register_post_types();
+    ta_register_lt_order();
+    ta_add_roles();
+    // Default packages
+    if (!get_option('ta_lt_packages')) {
+        update_option('ta_lt_packages', [
+            ['id' => 'pkg_0', 'lt' => 1000, 'vnd' => 10000, 'bonus' => 0],
+            ['id' => 'pkg_1', 'lt' => 5000, 'vnd' => 50000, 'bonus' => 10],
+            ['id' => 'pkg_2', 'lt' => 10000, 'vnd' => 100000, 'bonus' => 20],
+            ['id' => 'pkg_3', 'lt' => 50000, 'vnd' => 500000, 'bonus' => 50],
+        ]);
+    }
+    flush_rewrite_rules();
+});
