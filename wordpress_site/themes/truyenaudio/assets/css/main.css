@@ -58,7 +58,7 @@ img { max-width: 100%; }
 
 /* ========== HEADER ========== */
 .site-header { background: var(--bg-header); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; transition: background .3s; }
-.header-inner { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; max-width: 1600px; margin: 0 auto; }
+.header-inner { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; width: 100%; }
 .site-title { font-size: 24px; font-weight: 800; color: var(--accent); }
 .site-title span { color: #fff; }
 [data-theme="light"] .site-title span { color: #222; }
@@ -389,7 +389,7 @@ img { max-width: 100%; }
 .role-badge.admin { background: #e74c3c; color: #fff; }
 .role-badge.user { background: #3498db; color: #fff; }
 
-.flash-container { max-width: 1600px; margin: 15px auto 0; padding: 0 15px; }
+.flash-container { width: 100%; margin: 15px auto 0; padding: 0 15px; }
 .flash { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; animation: flashIn .3s ease; }
 .flash-success { background: #0d2e1a; border: 1px solid #2ecc71; color: #2ecc71; }
 .flash-error { background: #2e0d0d; border: 1px solid #e74c3c; color: #e74c3c; }
