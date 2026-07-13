@@ -57,6 +57,14 @@ document.addEventListener('DOMContentLoaded', function() {
             overlayRight.style.transform = 'translateX(100%)';
         }, 300);
     });
+
+    var adminBarToggle = document.getElementById('wp-admin-bar-ta-theme-toggle');
+    if (adminBarToggle) {
+        adminBarToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            toggle.click();
+        });
+    }
 });
 
 jQuery(function($) {

@@ -58,49 +58,6 @@ add_action('admin_enqueue_scripts', function () {
     ');
 });
 
-// Admin bar theme toggle JS (frontend when logged in)
-add_action('wp_enqueue_scripts', function () {
-    if (!is_user_logged_in()) return;
-    wp_add_inline_script('jquery', '
-        jQuery(function($) {
-            if (!$("#wp-admin-bar-ta-theme-toggle").length) return;
-            function syncIcons(t) {
-                var label = $("#ta-theme-label");
-                if (label.length) label.text(t === "dark" ? "🌙 Tối" : "☀️ Sáng");
-                var ft = $("#theme-toggle");
-                if (ft.length) ft.text(t === "dark" ? "🌙" : "☀️");
-            }
-            var theme = localStorage.getItem("ta_theme") || "light";
-            $("html").attr("data-theme", theme);
-            syncIcons(theme);
-            $(document).on("click", "#wp-admin-bar-ta-theme-toggle .ab-item, #theme-toggle", function(e) {
-                if ($(this).is("#wp-admin-bar-ta-theme-toggle .ab-item")) e.preventDefault();
-                var current = $("html").attr("data-theme") || "light";
-                var next = current === "light" ? "dark" : "light";
-                var $l = $("#ta-theme-overlay-left"), $r = $("#ta-theme-overlay-right");
-                var $fl = $("#theme-overlay-left"), $fr = $("#theme-overlay-right");
-                if ($l.length && $r.length) {
-                    $l.css("transform","translateX(0)"); $r.css("transform","translateX(0)");
-                }
-                if ($fl.length && $fr.length) {
-                    $fl.css("transform","translateX(0)"); $fr.css("transform","translateX(0)");
-                }
-                setTimeout(function() {
-                    $("html").attr("data-theme", next);
-                    localStorage.setItem("ta_theme", next);
-                    syncIcons(next);
-                    if ($l.length && $r.length) {
-                        $l.css("transform","translateX(-100%)"); $r.css("transform","translateX(100%)");
-                    }
-                    if ($fl.length && $fr.length) {
-                        $fl.css("transform","translateX(-100%)"); $fr.css("transform","translateX(100%)");
-                    }
-                }, 300);
-            });
-        });
-    ');
-});
-
 // Admin curtain overlay (both admin + frontend when logged in)
 add_action('admin_footer', function () {
     echo '<div id="ta-theme-overlay-left" style="position:fixed;top:0;bottom:0;left:0;width:50%;z-index:99999;background:#0f0f1a;transition:transform .5s ease;pointer-events:none;transform:translateX(-100%);"></div>';
