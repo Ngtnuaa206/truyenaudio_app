@@ -100,7 +100,6 @@ if ($can_read && is_user_logged_in() && $story_id) {
                     <span class="setting-label">Nền</span>
                     <button class="setting-btn theme-light" id="theme-light" title="Sáng">☀️</button>
                     <button class="setting-btn theme-dark" id="theme-dark" title="Tối">🌙</button>
-                    <button class="setting-btn theme-sepia" id="theme-sepia" title="Nâu">📜</button>
                 </div>
                 <div class="setting-divider"></div>
                 <div class="setting-group">

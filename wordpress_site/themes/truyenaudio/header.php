@@ -13,7 +13,9 @@
             <?php wp_nav_menu(['theme_location' => 'primary', 'menu_class' => 'nav-menu', 'container' => false, 'fallback_cb' => 'ta_menu_fallback']); ?>
         </nav>
         <div class="header-actions">
+            <?php if (!current_user_can('edit_posts')): ?>
             <button id="theme-toggle" class="theme-toggle" title="Chuyển giao diện">☀️</button>
+            <?php endif; ?>
             <?php if (is_user_logged_in()):
                 $user = wp_get_current_user();
                 $lt = get_user_meta($user->ID, '_linh_thach', true) ?: 0;
@@ -53,7 +55,9 @@
     <!-- Mobile Menu Overlay -->
     <div class="mobile-menu-overlay" id="mobile-menu">
         <div class="mobile-menu-head">
+            <?php if (!current_user_can('edit_posts')): ?>
             <button id="mobile-theme-toggle" class="mobile-theme-toggle" title="Chuyển giao diện">☀️</button>
+            <?php endif; ?>
             <button class="mobile-menu-close" onclick="toggleMobileMenu()">&times;</button>
         </div>
         <?php if (is_user_logged_in()):
@@ -215,6 +219,8 @@ if (mobileThemeToggle) {
         mobileThemeToggle.textContent = icon;
         var desktopToggle = document.getElementById('theme-toggle');
         if (desktopToggle) desktopToggle.textContent = icon;
+        var syncLabel = document.getElementById('ta-theme-label');
+        if (syncLabel) syncLabel.textContent = next === 'dark' ? '🌙 Tối' : '☀️ Sáng';
     });
 }
 </script>

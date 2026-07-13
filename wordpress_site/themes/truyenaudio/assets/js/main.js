@@ -28,7 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!toggle || !overlayLeft || !overlayRight) return;
 
     // Load saved theme
-    var saved = localStorage.getItem('ta_theme') || 'light';
+    var isAdmin = typeof ta_config !== 'undefined' && ta_config.is_admin;
+    var saved = isAdmin ? 'light' : (localStorage.getItem('ta_theme') || 'light');
     html.setAttribute('data-theme', saved);
     toggle.textContent = saved === 'dark' ? '🌙' : '☀️';
 
@@ -36,9 +37,12 @@ document.addEventListener('DOMContentLoaded', function() {
         var label = document.getElementById('ta-theme-label');
         if (label) label.textContent = theme === 'dark' ? '🌙 Tối' : '☀️ Sáng';
         if (toggle) toggle.textContent = theme === 'dark' ? '🌙' : '☀️';
+        var mobileToggle = document.getElementById('mobile-theme-toggle');
+        if (mobileToggle) mobileToggle.textContent = theme === 'dark' ? '🌙' : '☀️';
     }
 
     toggle.addEventListener('click', function() {
+        if (isAdmin) return;
         var current = html.getAttribute('data-theme') || 'light';
         var next = current === 'light' ? 'dark' : 'light';
 
@@ -241,13 +245,18 @@ jQuery(function($) {
 
         $('#theme-light').on('click', function() { applyReadingTheme('light'); });
         $('#theme-dark').on('click', function() { applyReadingTheme('dark'); });
-        $('#theme-sepia').on('click', function() { applyReadingTheme('sepia'); });
 
         function applyReadingTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('ta_reading_theme', theme);
+            localStorage.setItem('ta_theme', theme);
             $('.setting-btn[id^="theme-"]').removeClass('active');
             $('#theme-' + theme).addClass('active');
+            var icon = theme === 'dark' ? '🌙' : '☀️';
+            var toggle = document.getElementById('theme-toggle');
+            if (toggle) toggle.textContent = icon;
+            var mobileToggle = document.getElementById('mobile-theme-toggle');
+            if (mobileToggle) mobileToggle.textContent = icon;
         }
 
         // Auto-scroll

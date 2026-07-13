@@ -13,6 +13,7 @@ add_action('wp_enqueue_scripts', function () {
     wp_enqueue_style('ta-main', get_template_directory_uri() . '/assets/css/main.css', [], filemtime(get_template_directory() . '/assets/css/main.css'));
     wp_enqueue_script('ta-main', get_template_directory_uri() . '/assets/js/main.js', ['jquery'], filemtime(get_template_directory() . '/assets/js/main.js'), true);
     wp_localize_script('ta-main', 'ta_ajax', ['ajax_url' => admin_url('admin-ajax.php')]);
+    wp_localize_script('ta-main', 'ta_config', ['is_admin' => current_user_can('edit_posts')]);
 });
 
 // Admin styles
@@ -113,6 +114,7 @@ add_action('wp_footer', function () {
 
 // Admin bar theme toggle
 add_action('admin_bar_menu', function ($wp_admin_bar) {
+    if (current_user_can('edit_posts')) return;
     $wp_admin_bar->add_node([
         'id'    => 'ta-theme-toggle',
         'title' => '<span id="ta-theme-label">☀️ Sáng</span>',

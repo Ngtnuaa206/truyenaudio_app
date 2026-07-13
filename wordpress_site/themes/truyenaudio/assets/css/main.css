@@ -35,20 +35,6 @@
     --reading-bg: #ffffff;
     --reading-text: #333333;
 }
-[data-theme="sepia"] {
-    --bg-body: #f4ecd8;
-    --bg-card: #faf6eb;
-    --bg-header: #faf6eb;
-    --text: #5b4636;
-    --text-muted: #8b7355;
-    --text-light: #a08c6e;
-    --border: #d4c5a9;
-    --accent: #c78800;
-    --accent-hover: #a06d00;
-    --input-bg: #faf6eb;
-    --reading-bg: #f4ecd8;
-    --reading-text: #5b4636;
-}
 
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-body); color: var(--text); line-height: 1.6; transition: background .3s, color .3s; }
 a { color: var(--accent); text-decoration: none; }
@@ -244,7 +230,6 @@ img { max-width: 100%; }
 .setting-btn.active { background: var(--accent); color: var(--bg-card); border-color: var(--accent); }
 .setting-btn.theme-light { background: #fff; color: #333; border: 2px solid #d0d5dd; }
 .setting-btn.theme-dark { background: #1a1a2e; color: #e0e0e0; border: 2px solid #2a2a4e; }
-.setting-btn.theme-sepia { background: #f4ecd8; color: #5b4636; border: 2px solid #d4c5a9; }
 .setting-divider { width: 1px; height: 24px; background: var(--border); }
 .font-size-display { font-size: 13px; font-weight: 600; color: var(--text); min-width: 36px; text-align: center; }
 .line-spacing-select { background: var(--border); border: 1px solid transparent; color: var(--text-muted); padding: 4px 8px; border-radius: 6px; font-size: 12px; cursor: pointer; }
@@ -661,37 +646,3 @@ img { max-width: 100%; }
 [data-theme="light"] .toast-info { background: #d1ecf1; border-color: #3498db; color: #0c5460; }
 [data-theme="light"] .reader-story-info h2 { color: #222; }
 [data-theme="light"] .sidebar-story-title { color: #222; }
-
-/* ========== SEPIA MODE OVERRIDES ========== */
-[data-theme="sepia"] .story-card, [data-theme="sepia"] .story-row,
-[data-theme="sepia"] .filter-bar, [data-theme="sepia"] .chapter-list-section,
-[data-theme="sepia"] .reader-content-section, [data-theme="sepia"] .audio-player-section,
-[data-theme="sepia"] .auth-form, [data-theme="sepia"] .user-dropdown .dropdown-menu,
-[data-theme="sepia"] .profile-card, [data-theme="sepia"] .site-footer,
-[data-theme="sepia"] .ranking-item, [data-theme="sepia"] .category-item,
-[data-theme="sepia"] .story-hero, [data-theme="sepia"] .story-description,
-[data-theme="sepia"] .reader-story-header, [data-theme="sepia"] .reading-settings-bar,
-[data-theme="sepia"] .sidebar-widget, [data-theme="sepia"] .sticky-audio-bar,
-[data-theme="sepia"] .modal-box {
-    background: #faf6eb;
-    border-color: #d4c5a9;
-}
-[data-theme="sepia"] .story-title, [data-theme="sepia"] .chapter-list-header h3,
-[data-theme="sepia"] .profile-card h3, [data-theme="sepia"] .section-header h2,
-[data-theme="sepia"] .story-hero-info h1, [data-theme="sepia"] .auth-form h2,
-[data-theme="sepia"] .footer-col h4, [data-theme="sepia"] .category-item .cat-name,
-[data-theme="sepia"] .sidebar-widget-title, [data-theme="sepia"] .reader-content-section h1 {
-    color: #5b4636;
-}
-[data-theme="sepia"] .reader-content { color: #5b4636; }
-[data-theme="sepia"] .chapter-item a { color: #5b4636; }
-[data-theme="sepia"] .filter-bar select, [data-theme="sepia"] .filter-bar input,
-[data-theme="sepia"] .auth-form input[type="text"], [data-theme="sepia"] .auth-form input[type="email"],
-[data-theme="sepia"] .auth-form input[type="password"] {
-    background: #faf6eb;
-    border-color: #d4c5a9;
-    color: #5b4636;
-}
-[data-theme="sepia"] .sidebar-story-title { color: #5b4636; }
-[data-theme="sepia"] .reader-story-info h2 { color: #5b4636; }
-[data-theme="sepia"] .mobile-nav-toggle { color: #5b4636; }
