@@ -54,11 +54,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 img { max-width: 100%; }
-.container { max-width: 1200px; margin: 0 auto; padding: 0 15px; }
+.container { max-width: 1500px; margin: 0 auto; padding: 0 15px; }
 
 /* ========== HEADER ========== */
 .site-header { background: var(--bg-header); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; transition: background .3s; }
-.header-inner { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; max-width: 1200px; margin: 0 auto; }
+.header-inner { display: flex; align-items: center; justify-content: space-between; padding: 12px 15px; max-width: 1500px; margin: 0 auto; }
 .site-title { font-size: 24px; font-weight: 800; color: var(--accent); }
 .site-title span { color: #fff; }
 [data-theme="light"] .site-title span { color: #222; }
@@ -81,7 +81,7 @@ img { max-width: 100%; }
 .breadcrumb span { margin: 0 6px; }
 
 /* ========== MAIN + SIDEBAR LAYOUT ========== */
-.content-layout { display: grid; grid-template-columns: 1fr var(--sidebar-width); gap: 30px; padding: 30px 0; }
+.content-layout { display: grid; grid-template-columns: 1fr var(--sidebar-width); gap: 30px; padding: 30px 0; align-items: start; }
 .main-content { min-width: 0; }
 .sidebar { min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 .sidebar > .sidebar-widget { margin-bottom: 0; }
@@ -160,7 +160,7 @@ img { max-width: 100%; }
 .story-description .desc-text { color: var(--text-muted); line-height: 1.8; font-size: 15px; }
 
 /* ========== READER PAGE LAYOUT ========== */
-.reader-layout { display: grid; grid-template-columns: 1fr var(--sidebar-width); gap: 30px; padding: 30px 0; }
+.reader-layout { display: grid; grid-template-columns: 1fr var(--sidebar-width); gap: 30px; padding: 30px 0; align-items: start; }
 .reader-main { min-width: 0; }
 
 /* ========== READER HEADER ========== */
@@ -352,7 +352,7 @@ img { max-width: 100%; }
 .role-badge.admin { background: #e74c3c; color: #fff; }
 .role-badge.user { background: #3498db; color: #fff; }
 
-.flash-container { max-width: 1200px; margin: 15px auto 0; padding: 0 15px; }
+.flash-container { max-width: 1500px; margin: 15px auto 0; padding: 0 15px; }
 .flash { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: 10px; margin-bottom: 10px; font-size: 14px; animation: flashIn .3s ease; }
 .flash-success { background: #0d2e1a; border: 1px solid #2ecc71; color: #2ecc71; }
 .flash-error { background: #2e0d0d; border: 1px solid #e74c3c; color: #e74c3c; }
@@ -376,20 +376,12 @@ img { max-width: 100%; }
 #theme-overlay-left { left: 0; transform: translateX(-100%); }
 #theme-overlay-right { right: 0; transform: translateX(100%); }
 
-/* ========== RESPONSIVE: 1024-1279 ========== */
-@media (max-width: 1279px) {
-    :root { --sidebar-width: 597px; }
-}
-
-/* ========== RESPONSIVE: 768-1023 (tablet) ========== */
-@media (max-width: 1023px) {
+/* ========== RESPONSIVE: 768+ (two-column) ========== */
+@media (min-width: 768px) {
     .content-layout,
     .reader-layout {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr var(--sidebar-width);
     }
-    .sidebar { order: 2; }
-    .chapter-list-section { max-width: 597px; margin-left: auto; margin-right: auto; }
-    .chapter-list-scroll { max-height: 686px; }
 }
 
 /* ========== RESPONSIVE: <768 (mobile) ========== */
