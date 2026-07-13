@@ -446,13 +446,14 @@ img { max-width: 100%; }
 }
 
 /* ========== HEADER RESPONSIVE ========== */
-@media (max-width: 768px) {
+@media (max-width: 851px) {
     .nav-menu { display: none; }
     .nav-menu.active { display: flex; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); padding: 15px; border-bottom: 1px solid var(--border); gap: 10px; z-index: 200; }
-    .mobile-nav-toggle { display: flex !important; margin-left: auto; }
+    .mobile-nav-toggle { display: flex !important; margin-left: 8px; }
 }
 @media (max-width: 620px) {
     .header-actions { display: none; }
+    .mobile-nav-toggle { margin-left: auto; }
 }
 @media (max-width: 220px) {
     .site-title { font-size: 18px; }
