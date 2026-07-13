@@ -206,13 +206,15 @@ function toggleMobileNotif() {
 var mobileThemeToggle = document.getElementById('mobile-theme-toggle');
 if (mobileThemeToggle) {
     mobileThemeToggle.addEventListener('click', function() {
-        var current = document.documentElement.getAttribute('data-theme') || 'dark';
-        var next = current === 'dark' ? 'light' : current === 'light' ? 'sepia' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
-        this.textContent = next === 'dark' ? '☀️' : next === 'light' ? '☀️' : '🌙';
+        var html = document.documentElement;
+        var current = html.getAttribute('data-theme') || 'light';
+        var next = current === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('ta_theme', next);
+        var icon = next === 'dark' ? '🌙' : '☀️';
+        mobileThemeToggle.textContent = icon;
         var desktopToggle = document.getElementById('theme-toggle');
-        if (desktopToggle) desktopToggle.textContent = this.textContent;
+        if (desktopToggle) desktopToggle.textContent = icon;
     });
 }
 </script>
