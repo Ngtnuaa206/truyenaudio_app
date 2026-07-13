@@ -48,7 +48,52 @@
                 <a href="<?php echo home_url('/dang-ky'); ?>" class="btn btn-sm btn-primary">Đăng ký</a>
             <?php endif; ?>
         </div>
-        <button class="mobile-nav-toggle" onclick="document.querySelector('.nav-menu').classList.toggle('active')">☰</button>
+        <button class="mobile-nav-toggle" onclick="toggleMobileMenu()">☰</button>
+    </div>
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-menu-overlay" id="mobile-menu">
+        <div class="mobile-menu-head">
+            <button id="mobile-theme-toggle" class="mobile-theme-toggle" title="Chuyển giao diện">☀️</button>
+            <button class="mobile-menu-close" onclick="toggleMobileMenu()">&times;</button>
+        </div>
+        <?php if (is_user_logged_in()):
+            $mobile_user = wp_get_current_user();
+            $mobile_lt = get_user_meta($mobile_user->ID, '_linh_thach', true) ?: 0;
+        ?>
+            <div class="mobile-user-section">
+                <button class="mobile-user-toggle" onclick="toggleMobileUser()">
+                    <span>👤 <?php echo esc_html($mobile_user->display_name); ?></span>
+                    <span class="mobile-user-arrow">▼</span>
+                </button>
+                <div class="mobile-user-items" id="mobile-user-items">
+                    <a href="<?php echo home_url('/linh-thach'); ?>">💎 Linh Thạch: <?php echo number_format($mobile_lt); ?></a>
+                    <a href="<?php echo home_url('/profile'); ?>">Thông tin cá nhân</a>
+                    <a href="<?php echo home_url('/theo-doi'); ?>">Truyện theo dõi</a>
+                    <a href="<?php echo home_url('/lich-su'); ?>">Lịch sử đọc</a>
+                    <?php if (current_user_can('edit_posts')): ?>
+                        <a href="<?php echo admin_url(); ?>">Quản trị</a>
+                    <?php endif; ?>
+                    <a href="<?php echo wp_logout_url(home_url()); ?>">Đăng xuất</a>
+                </div>
+            </div>
+            <div class="mobile-notif-section">
+                <button class="mobile-notif-toggle" onclick="toggleMobileNotif()">
+                    <span>🔔 Thông báo</span>
+                    <span class="mobile-notif-badge" id="mobile-notif-badge" style="display:none;">0</span>
+                </button>
+                <div class="mobile-notif-items" id="mobile-notif-items">
+                    <div class="notif-empty">Đang tải...</div>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="mobile-auth-section">
+                <a href="<?php echo home_url('/dang-nhap'); ?>" class="btn btn-outline">Đăng nhập</a>
+                <a href="<?php echo home_url('/dang-ky'); ?>" class="btn btn-primary">Đăng ký</a>
+            </div>
+        <?php endif; ?>
+        <div class="mobile-nav-section">
+            <?php wp_nav_menu(['theme_location' => 'primary', 'menu_class' => 'mobile-nav-list', 'container' => false, 'fallback_cb' => 'ta_menu_fallback']); ?>
+        </div>
     </div>
 </header>
 
@@ -117,6 +162,59 @@ jQuery(function($) {
         }
     });
 });
+</script>
+<script>
+function toggleMobileMenu() {
+    document.getElementById('mobile-menu').classList.toggle('active');
+    document.body.style.overflow = document.getElementById('mobile-menu').classList.contains('active') ? 'hidden' : '';
+}
+function toggleMobileUser() {
+    var items = document.getElementById('mobile-user-items');
+    var arrow = document.querySelector('.mobile-user-arrow');
+    items.classList.toggle('active');
+    arrow.classList.toggle('open');
+}
+function toggleMobileNotif() {
+    var items = document.getElementById('mobile-notif-items');
+    items.classList.toggle('active');
+    if (items.classList.contains('active')) {
+        jQuery.ajax({
+            type: 'POST',
+            url: ta_ajax.ajax_url || ajaxurl,
+            data: { action: 'ta_get_notifications' },
+            success: function(res) {
+                if (!res.success) { items.innerHTML = '<div class="notif-empty">' + res.data + '</div>'; return; }
+                document.getElementById('mobile-notif-badge').style.display = 'none';
+                if (!res.data.items.length) {
+                    items.innerHTML = '<div class="notif-empty">Không có thông báo</div>';
+                    return;
+                }
+                var html = '';
+                jQuery.each(res.data.items, function(i, n) {
+                    var icon = n.type === 'success' ? '✅' : n.type === 'error' ? '❌' : n.type === 'warning' ? '⚠️' : 'ℹ️';
+                    html += '<div class="notif-item' + (n.is_new ? ' notif-new' : '') + '">';
+                    html += '<div class="notif-icon">' + icon + '</div>';
+                    html += '<div class="notif-body"><div class="notif-text">' + n.message + '</div>';
+                    html += '<div class="notif-time">' + n.time + '</div></div></div>';
+                });
+                items.innerHTML = html;
+            },
+            error: function() { items.innerHTML = '<div class="notif-empty">Lỗi tải thông báo</div>'; }
+        });
+    }
+}
+var mobileThemeToggle = document.getElementById('mobile-theme-toggle');
+if (mobileThemeToggle) {
+    mobileThemeToggle.addEventListener('click', function() {
+        var current = document.documentElement.getAttribute('data-theme') || 'dark';
+        var next = current === 'dark' ? 'light' : current === 'light' ? 'sepia' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        this.textContent = next === 'dark' ? '☀️' : next === 'light' ? '☀️' : '🌙';
+        var desktopToggle = document.getElementById('theme-toggle');
+        if (desktopToggle) desktopToggle.textContent = this.textContent;
+    });
+}
 </script>
 
 <style>

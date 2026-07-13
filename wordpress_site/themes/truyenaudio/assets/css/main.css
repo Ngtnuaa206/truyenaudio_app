@@ -445,16 +445,124 @@ img { max-width: 100%; }
     .reading-settings-bar > .setting-divider:nth-child(n+3) { display: none; }
 }
 
+/* ========== MOBILE MENU OVERLAY ========== */
+.mobile-menu-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg-body);
+    z-index: 9999;
+    flex-direction: column;
+    padding: 16px;
+    overflow-y: auto;
+}
+.mobile-menu-overlay.active { display: flex; }
+.mobile-menu-head {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+}
+.mobile-theme-toggle {
+    background: none; border: none; font-size: 24px; cursor: pointer;
+    color: var(--text); width: 40px; height: 40px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.mobile-theme-toggle:hover { background: var(--border); }
+.mobile-menu-close {
+    background: none; border: none; font-size: 28px; cursor: pointer;
+    color: var(--text); width: 40px; height: 40px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.mobile-menu-close:hover { background: var(--border); }
+.mobile-user-section,
+.mobile-notif-section,
+.mobile-auth-section,
+.mobile-nav-section {
+    margin-bottom: 12px;
+}
+.mobile-user-toggle, .mobile-notif-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.mobile-user-toggle:hover, .mobile-notif-toggle:hover { background: var(--border); }
+.mobile-user-arrow { font-size: 12px; transition: transform 0.3s; }
+.mobile-user-arrow.open { transform: rotate(180deg); }
+.mobile-user-items, .mobile-notif-items {
+    display: none;
+    flex-direction: column;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0 0 10px 10px;
+    margin-top: -6px;
+    padding: 6px 0;
+    overflow: hidden;
+}
+.mobile-user-items.active, .mobile-notif-items.active { display: flex; }
+.mobile-user-items a, .mobile-nav-list a {
+    display: block;
+    padding: 12px 16px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+.mobile-user-items a:hover, .mobile-nav-list a:hover { background: var(--border); }
+.mobile-auth-section {
+    display: flex;
+    gap: 10px;
+}
+.mobile-auth-section .btn { flex: 1; text-align: center; }
+.mobile-nav-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.mobile-nav-list li { border-bottom: 1px solid var(--border); }
+.mobile-nav-list li:last-child { border-bottom: none; }
+.mobile-nav-list a {
+    display: block;
+    padding: 14px 16px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+.mobile-nav-list a:hover { background: var(--border); }
+.mobile-notif-badge {
+    background: #e74c3c; color: #fff; font-size: 11px; font-weight: 700;
+    min-width: 18px; height: 18px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 5px;
+}
+.mobile-notif-items .notif-item { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.mobile-notif-items .notif-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+
 /* ========== HEADER RESPONSIVE ========== */
 @media (max-width: 851px) {
     .nav-menu { display: none; }
-    .nav-menu.active { display: flex; flex-direction: column; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); padding: 15px; border-bottom: 1px solid var(--border); gap: 10px; z-index: 200; }
-    .header-actions { margin-left: auto; }
-    .mobile-nav-toggle { display: flex !important; margin-left: 8px; }
-}
-@media (max-width: 620px) {
-    .header-actions { display: none; }
-    .mobile-nav-toggle { margin-left: auto; }
+    .header-actions { display: none; margin-left: auto; }
+    .mobile-nav-toggle { display: flex !important; margin-left: auto; }
 }
 @media (max-width: 220px) {
     .site-title { font-size: 18px; }
