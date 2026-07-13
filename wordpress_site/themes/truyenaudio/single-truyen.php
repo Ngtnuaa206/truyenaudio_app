@@ -110,49 +110,49 @@ if (is_user_logged_in()) {
             </div>
         </div>
 
-        <!-- Sidebar -->
+        <!-- Sidebar (widgets only) -->
         <div class="sidebar">
-            <!-- Chapter List -->
-            <div class="chapter-list-section sidebar-widget">
-                <div class="chapter-list-header">
-                    <h3>Danh sách chương</h3>
-                    <span class="chapter-count"><?php echo count($chapters); ?> chương</span>
-                </div>
-                <div class="chapter-list-scroll">
-                    <?php if (empty($chapters)): ?>
-                        <p style="color:var(--text-muted);text-align:center;padding:40px 16px;">Chưa có chương nào.</p>
-                    <?php else: ?>
-                        <?php foreach ($chapters as $ch):
-                            $is_vip = get_post_meta($ch->ID, '_is_vip', true);
-                            $can_read = ta_can_read_chapter($ch->ID, get_the_ID());
-                            $chapter_num = get_post_meta($ch->ID, '_chapter_number', true);
-                            $audio_url = get_post_meta($ch->ID, '_audio_url', true);
-                        ?>
-                        <div class="chapter-item">
-                            <a href="<?php echo get_permalink($ch->ID); ?>" class="<?php echo $can_read ? '' : 'locked'; ?>">
-                                <span class="chapter-num"><?php echo $chapter_num ?: ''; ?></span>
-                                <?php echo $ch->post_title; ?>
-                            </a>
-                            <div class="chapter-badges">
-                                <?php if ($audio_url): ?>
-                                    <span class="audio-badge">🎧</span>
-                                <?php endif; ?>
-                                <?php if ($is_vip): ?>
-                                    <span class="vip-badge">VIP</span>
-                                <?php else: ?>
-                                    <span class="free-badge">FREE</span>
-                                <?php endif; ?>
-                                <?php if (!$can_read): ?>
-                                    <span style="color:var(--text-muted);">🔒</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-            </div>
-
             <?php get_sidebar(); ?>
+        </div>
+
+        <!-- Chapter List (CSS Grid places it in sidebar column at >1024, full width below at 768-1024) -->
+        <div class="chapter-list-section sidebar-widget chapter-list-grid">
+            <div class="chapter-list-header">
+                <h3>Danh sách chương</h3>
+                <span class="chapter-count"><?php echo count($chapters); ?> chương</span>
+            </div>
+            <div class="chapter-list-scroll">
+                <?php if (empty($chapters)): ?>
+                    <p style="color:var(--text-muted);text-align:center;padding:40px 16px;">Chưa có chương nào.</p>
+                <?php else: ?>
+                    <?php foreach ($chapters as $ch):
+                        $is_vip = get_post_meta($ch->ID, '_is_vip', true);
+                        $can_read = ta_can_read_chapter($ch->ID, get_the_ID());
+                        $chapter_num = get_post_meta($ch->ID, '_chapter_number', true);
+                        $audio_url = get_post_meta($ch->ID, '_audio_url', true);
+                    ?>
+                    <div class="chapter-item">
+                        <a href="<?php echo get_permalink($ch->ID); ?>" class="<?php echo $can_read ? '' : 'locked'; ?>">
+                            <span class="chapter-num"><?php echo $chapter_num ?: ''; ?></span>
+                            <?php echo $ch->post_title; ?>
+                        </a>
+                        <div class="chapter-badges">
+                            <?php if ($audio_url): ?>
+                                <span class="audio-badge">🎧</span>
+                            <?php endif; ?>
+                            <?php if ($is_vip): ?>
+                                <span class="vip-badge">VIP</span>
+                            <?php else: ?>
+                                <span class="free-badge">FREE</span>
+                            <?php endif; ?>
+                            <?php if (!$can_read): ?>
+                                <span style="color:var(--text-muted);">🔒</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 </div>
