@@ -255,8 +255,9 @@ if (!empty($flash_messages)): ?>
 <?php endif; ?>
 
 <?php
-function ta_menu_fallback() {
-    echo '<ul class="nav-menu">';
+function ta_menu_fallback($args = []) {
+    $class = !empty($args['menu_class']) ? $args['menu_class'] : 'nav-menu';
+    echo '<ul class="' . esc_attr($class) . '">';
     echo '<li><a href="' . home_url() . '">Trang Chủ</a></li>';
     echo '<li><a href="' . home_url('/the-loai') . '">Thể Loại</a></li>';
     echo '<li><a href="' . home_url('/truyen') . '">Truyện</a></li>';
