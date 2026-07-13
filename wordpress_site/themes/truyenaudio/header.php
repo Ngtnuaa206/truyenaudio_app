@@ -9,7 +9,6 @@
 <header class="site-header">
     <div class="header-inner">
         <a href="<?php echo home_url(); ?>" class="site-title">Truyen<span>Audio</span></a>
-        <button class="mobile-nav-toggle" onclick="document.querySelector('.nav-menu').classList.toggle('active')">☰</button>
         <nav>
             <?php wp_nav_menu(['theme_location' => 'primary', 'menu_class' => 'nav-menu', 'container' => false, 'fallback_cb' => 'ta_menu_fallback']); ?>
         </nav>
@@ -49,6 +48,7 @@
                 <a href="<?php echo home_url('/dang-ky'); ?>" class="btn btn-sm btn-primary">Đăng ký</a>
             <?php endif; ?>
         </div>
+        <button class="mobile-nav-toggle" onclick="document.querySelector('.nav-menu').classList.toggle('active')">☰</button>
     </div>
 </header>
 
