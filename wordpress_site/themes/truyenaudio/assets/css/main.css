@@ -83,17 +83,14 @@ img { max-width: 100%; }
 /* ========== MAIN + SIDEBAR LAYOUT ========== */
 .content-layout { display: flex; gap: 30px; padding: 30px 0; align-items: flex-start; }
 .main-content { flex: none; width: 942px; }
-.sidebar { flex: none; width: var(--sidebar-width); display: flex; flex-direction: column; gap: 20px; }
+.sidebar { flex: none; width: 597px; display: flex; flex-direction: column; gap: 20px; }
 .sidebar > .sidebar-widget { margin-bottom: 0; }
-
-@media (max-width: 1535px) {
-    .main-content { width: 771px; }
-}
-@media (max-width: 1279px) {
-    .main-content { width: 601px; }
-}
-@media (max-width: 1023px) {
-    .main-content { flex: 1 1 auto; width: auto; }
+@media (max-width: 1535px) { .main-content { width: 771px; } }
+@media (max-width: 1279px) { .main-content { width: 601px; } }
+@media (max-width: 1023px) { .main-content { width: 736px; } }
+@media (max-width: 767px) {
+    .content-layout { flex-direction: column; gap: 20px; }
+    .main-content, .sidebar { width: 100% !important; flex: none !important; }
 }
 
 /* ========== SIDEBAR WIDGETS ========== */
@@ -173,15 +170,12 @@ img { max-width: 100%; }
 /* ========== READER PAGE LAYOUT ========== */
 .reader-layout { display: flex; gap: 30px; padding: 30px 0; align-items: flex-start; }
 .reader-main { flex: none; width: 942px; }
-
-@media (max-width: 1535px) {
-    .reader-main { width: 771px; }
-}
-@media (max-width: 1279px) {
-    .reader-main { width: 601px; }
-}
-@media (max-width: 1023px) {
-    .reader-main { flex: 1 1 auto; width: auto; }
+@media (max-width: 1535px) { .reader-main { width: 771px; } }
+@media (max-width: 1279px) { .reader-main { width: 601px; } }
+@media (max-width: 1023px) { .reader-main { width: 736px; } }
+@media (max-width: 767px) {
+    .reader-layout { flex-direction: column; gap: 20px; }
+    .reader-main, .reader-sidebar { width: 100% !important; flex: none !important; }
 }
 
 /* ========== READER HEADER ========== */
@@ -397,7 +391,14 @@ img { max-width: 100%; }
 #theme-overlay-left { left: 0; transform: translateX(-100%); }
 #theme-overlay-right { right: 0; transform: translateX(100%); }
 
-/* ========== RESPONSIVE: <768 (mobile single-column) ========== */
+/* ========== RESPONSIVE: <=1024 (story hero adjustments, chapter list below) ========== */
+@media (max-width: 1024px) {
+    .story-hero-cover { width: 220px; }
+    .story-hero-info { padding: 24px; }
+    .story-hero-info h1 { font-size: 22px; }
+    .story-description .desc-text { font-size: 14px; }
+}
+/* ========== RESPONSIVE: <=768 (mobile single-column) ========== */
 @media (max-width: 767px) {
     .container { padding: 0 10px; }
     .content-layout,
@@ -406,7 +407,8 @@ img { max-width: 100%; }
         gap: 16px;
         padding: 16px 0;
     }
-    .sidebar { order: 2; width: 100%; min-width: 0; flex: none; }
+    .main-content, .reader-main { width: 100% !important; flex: none !important; }
+    .sidebar, .reader-sidebar { order: 2; width: 100% !important; flex: none !important; min-width: 0; }
     .chapter-list-section { max-width: 100%; }
     .chapter-list-scroll { max-height: none; }
     .story-hero-inner { flex-direction: column; }
