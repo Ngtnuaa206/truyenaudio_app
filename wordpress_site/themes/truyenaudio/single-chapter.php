@@ -118,6 +118,22 @@ if ($can_read && is_user_logged_in() && $story_id) {
                     <button class="setting-btn" id="auto-scroll-btn" title="Tự động cuộn">↕️</button>
                 </div>
                 <button class="setting-btn fullscreen-btn" id="fullscreen-btn" title="Toàn màn hình">⛶</button>
+                <div class="settings-more-wrap">
+                    <button class="settings-more-btn" id="settings-more-btn" title="Thêm tùy chọn">⋯</button>
+                    <div class="settings-expanded" id="settings-expanded">
+                        <div class="setting-group">
+                            <select class="line-spacing-select" id="line-spacing-exp">
+                                <option value="1.5">1.5</option>
+                                <option value="1.8">1.8</option>
+                                <option value="2" selected>2.0</option>
+                                <option value="2.5">2.5</option>
+                                <option value="3">3.0</option>
+                            </select>
+                        </div>
+                        <button class="setting-btn" id="auto-scroll-btn-exp" title="Tự động cuộn">↕️</button>
+                        <button class="setting-btn fullscreen-btn" id="fullscreen-btn-exp" title="Toàn màn hình">⛶</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Chapter Content -->
@@ -514,8 +530,27 @@ jQuery(function($) {
         $('#theme-sepia').on('click', function(){applyReadingTheme('sepia');});
         function applyReadingTheme(theme){document.documentElement.setAttribute('data-theme',theme);localStorage.setItem('ta_reading_theme',theme);$('.setting-btn[id^="theme-"]').removeClass('active');$('#theme-'+theme).addClass('active');}
         var autoScrollInterval = null;
-        $('#auto-scroll-btn').on('click', function(){if(autoScrollInterval){clearInterval(autoScrollInterval);autoScrollInterval=null;$(this).removeClass('active');}else{$(this).addClass('active');autoScrollInterval=setInterval(function(){window.scrollBy(0,1);},50);}});
-        $('#fullscreen-btn').on('click', function(){if(!document.fullscreenElement){document.documentElement.requestFullscreen();}else{document.exitFullscreen();}});
+        $('#auto-scroll-btn, #auto-scroll-btn-exp').on('click', function(){
+            var $all = $('#auto-scroll-btn, #auto-scroll-btn-exp');
+            if(autoScrollInterval){clearInterval(autoScrollInterval);autoScrollInterval=null;$all.removeClass('active');}
+            else{$all.addClass('active');autoScrollInterval=setInterval(function(){window.scrollBy(0,1);},50);}
+        });
+        $('#fullscreen-btn, #fullscreen-btn-exp').on('click', function(){if(!document.fullscreenElement){document.documentElement.requestFullscreen();}else{document.exitFullscreen();}});
+        $('#line-spacing-exp').val(lineSpacing);
+        $('#line-spacing, #line-spacing-exp').on('change', function(){
+            lineSpacing=$(this).val();
+            $readerContent.css('line-height',lineSpacing);
+            localStorage.setItem('ta_line_spacing',lineSpacing);
+            $('#line-spacing').val(lineSpacing);
+            $('#line-spacing-exp').val(lineSpacing);
+        });
+
+        // Settings more button
+        $('#settings-more-btn').on('click', function(e){
+            e.stopPropagation();
+            $('#settings-expanded').toggleClass('show');
+        });
+        $(document).on('click', function(){ $('#settings-expanded').removeClass('show'); });
     }
 });
 </script>
