@@ -96,9 +96,9 @@ img { max-width: 100%; }
 @media (min-width: 1280px) and (max-width: 1535px) { .content-layout { max-width: 1195.656px; } .main-content { flex: 0 0 771px; } }
 @media (min-width: 1024px) and (max-width: 1279px) { .content-layout { max-width: 940.344px; } .main-content { flex: 0 0 601px; } }
 @media (min-width: 768px) and (max-width: 1023px) {
-    .content-layout { max-width: 100%; flex-direction: column; }
-    .main-content { flex: 0 0 686px; margin: 0 auto; }
-    .layout-sidebar { flex: 0 0 100%; }
+    .content-layout { max-width: 100%; flex-direction: column; align-items: center; }
+    .main-content { flex: 0 0 686px; }
+    .layout-sidebar { flex: 0 0 100%; align-items: stretch; }
 }
 @media (max-width: 767px) {
     .content-layout { flex-direction: column; gap: 20px; padding: 16px 0; }
@@ -191,9 +191,9 @@ img { max-width: 100%; }
 @media (min-width: 1280px) and (max-width: 1535px) { .reader-layout { max-width: 1195.656px; } .reader-main { flex: 0 0 771px; } .reader-sidebar { flex: 1; } }
 @media (min-width: 1024px) and (max-width: 1279px) { .reader-layout { max-width: 940.344px; } .reader-main { flex: 0 0 601px; } .reader-sidebar { flex: 1; } }
 @media (min-width: 768px) and (max-width: 1023px) {
-    .reader-layout { max-width: 100%; flex-direction: column; }
-    .reader-main { flex: 0 0 686px; margin: 0 auto; }
-    .reader-sidebar { flex: 0 0 100%; }
+    .reader-layout { max-width: 100%; flex-direction: column; align-items: center; }
+    .reader-main { flex: 0 0 686px; }
+    .reader-sidebar { flex: 0 0 100%; align-items: stretch; }
 }
 @media (max-width: 767px) {
     .reader-layout { flex-direction: column; gap: 20px; padding: 16px 0; }
