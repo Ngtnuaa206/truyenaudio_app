@@ -86,14 +86,20 @@ img { max-width: 100%; }
     gap: 30px;
     padding: 30px 0;
     align-items: flex-start;
+    margin: 0 auto;
 }
-.main-content { flex: 1 1 auto; min-width: 0; max-width: 942px; }
-.layout-sidebar { flex: 0 0 597px; display: flex; flex-direction: column; gap: 20px; }
+.main-content { min-width: 0; }
+.layout-sidebar { flex: 1; display: flex; flex-direction: column; gap: 20px; }
 .layout-sidebar > .sidebar-widget { margin-bottom: 0; }
 .sidebar { display: flex; flex-direction: column; gap: 20px; }
-@media (max-width: 1535px) { .main-content { max-width: 771px; } }
-@media (max-width: 1279px) { .main-content { max-width: 601px; } }
-@media (max-width: 1023px) { .main-content { max-width: 736px; } }
+@media (min-width: 1536px) { .content-layout { max-width: 1452px; } .main-content { flex: 0 0 942px; } }
+@media (min-width: 1280px) and (max-width: 1535px) { .content-layout { max-width: 1195.656px; } .main-content { flex: 0 0 771px; } }
+@media (min-width: 1024px) and (max-width: 1279px) { .content-layout { max-width: 940.344px; } .main-content { flex: 0 0 601px; } }
+@media (min-width: 768px) and (max-width: 1023px) {
+    .content-layout { max-width: 1452px; }
+    .main-content { flex: 0 0 686px; margin: 25px 0; }
+    .layout-sidebar { flex: 0 0 736px; }
+}
 @media (max-width: 767px) {
     .content-layout { flex-direction: column; gap: 20px; padding: 16px 0; }
     .main-content, .layout-sidebar { flex: 0 0 100%; max-width: 100%; }
@@ -150,6 +156,9 @@ img { max-width: 100%; }
 @media (min-width: 1024px) and (max-width: 1279px) {
     .chapter-list-scroll { max-height: 259px; }
 }
+@media (min-width: 768px) and (max-width: 1023px) {
+    .chapter-list-scroll { max-height: none; }
+}
 
 /* ========== STORY DETAIL HEADER ========== */
 .story-hero { background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border); overflow: hidden; margin-bottom: 24px; }
@@ -174,13 +183,18 @@ img { max-width: 100%; }
 .story-description .desc-text { color: var(--text-muted); line-height: 1.8; font-size: 15px; }
 
 /* ========== READER PAGE LAYOUT ========== */
-.reader-layout { display: flex; gap: 30px; padding: 30px 0; align-items: flex-start; }
-.reader-main { flex: 1 1 auto; min-width: 0; max-width: 942px; }
-.reader-sidebar { flex: 0 0 597px; display: flex; flex-direction: column; gap: 20px; }
+.reader-layout { display: flex; gap: 30px; padding: 30px 0; align-items: flex-start; margin: 0 auto; }
+.reader-main { min-width: 0; }
+.reader-sidebar { display: flex; flex-direction: column; gap: 20px; }
 .reader-sidebar > .sidebar-widget { margin-bottom: 0; }
-@media (max-width: 1535px) { .reader-main { max-width: 771px; } }
-@media (max-width: 1279px) { .reader-main { max-width: 601px; } }
-@media (max-width: 1023px) { .reader-main { max-width: 736px; } }
+@media (min-width: 1536px) { .reader-layout { max-width: 1452px; } .reader-main { flex: 0 0 942px; } .reader-sidebar { flex: 1; } }
+@media (min-width: 1280px) and (max-width: 1535px) { .reader-layout { max-width: 1195.656px; } .reader-main { flex: 0 0 771px; } .reader-sidebar { flex: 1; } }
+@media (min-width: 1024px) and (max-width: 1279px) { .reader-layout { max-width: 940.344px; } .reader-main { flex: 0 0 601px; } .reader-sidebar { flex: 1; } }
+@media (min-width: 768px) and (max-width: 1023px) {
+    .reader-layout { max-width: 1452px; }
+    .reader-main { flex: 0 0 686px; margin: 25px 0; }
+    .reader-sidebar { flex: 0 0 736px; }
+}
 @media (max-width: 767px) {
     .reader-layout { flex-direction: column; gap: 20px; padding: 16px 0; }
     .reader-main, .reader-sidebar { flex: 0 0 100%; max-width: 100%; }
@@ -399,8 +413,8 @@ img { max-width: 100%; }
 #theme-overlay-left { left: 0; transform: translateX(-100%); }
 #theme-overlay-right { right: 0; transform: translateX(100%); }
 
-/* ========== RESPONSIVE: <=1024 (story hero adjustments, chapter list below) ========== */
-@media (max-width: 1024px) {
+/* ========== RESPONSIVE: <=1024 (story hero adjustments) ========== */
+@media (max-width: 1023px) {
     .story-hero-cover { width: 220px; }
     .story-hero-info { padding: 24px; }
     .story-hero-info h1 { font-size: 22px; }
