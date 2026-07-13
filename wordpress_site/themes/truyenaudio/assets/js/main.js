@@ -42,7 +42,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     toggle.addEventListener('click', function() {
-        if (isAdmin) return;
         var current = html.getAttribute('data-theme') || 'light';
         var next = current === 'light' ? 'dark' : 'light';
 
