@@ -830,6 +830,76 @@ function ta_purchase_vip_chapter() {
     ]);
 }
 
+// ==================== AJAX LOAD CHAPTER (for in-page switching) ====================
+add_action('wp_ajax_ta_load_chapter', 'ta_ajax_load_chapter');
+add_action('wp_ajax_nopriv_ta_load_chapter', 'ta_ajax_load_chapter');
+function ta_ajax_load_chapter() {
+    $chapter_id = intval($_POST['chapter_id']);
+    if (!$chapter_id) wp_send_json_error('Thiếu chapter_id');
+
+    $chapter = get_post($chapter_id);
+    if (!$chapter || $chapter->post_type !== 'chapter') wp_send_json_error('Không tìm thấy chương');
+
+    $story_id = get_post_meta($chapter_id, '_story_id', true);
+    $can_read = ta_can_read_chapter($chapter_id, $story_id);
+    $is_vip = get_post_meta($chapter_id, '_is_vip', true);
+    $vip_price = get_post_meta($chapter_id, '_vip_price', true) ?: 5;
+    $audio_url = get_post_meta($chapter_id, '_audio_url', true);
+    $chapter_num = get_post_meta($chapter_id, '_chapter_number', true);
+    $chapter_content = '';
+    $login_required = false;
+    $purchase_required = false;
+
+    if ($can_read) {
+        $chapter_content = apply_filters('the_content', $chapter->post_content);
+    } elseif (!is_user_logged_in()) {
+        $login_required = true;
+    } elseif ($is_vip === '1') {
+        $purchase_required = true;
+    }
+
+    // Save reading history
+    if ($can_read && is_user_logged_in() && $story_id) {
+        $history = get_user_meta(get_current_user_id(), '_reading_history', true) ?: [];
+        $history[$story_id] = ['chapter_id' => $chapter_id, 'time' => current_time('mysql')];
+        update_user_meta(get_current_user_id(), '_reading_history', $history);
+    }
+
+    // Get prev/next
+    $chapters = ta_get_chapters($story_id);
+    $prev_id = null;
+    $next_id = null;
+    foreach ($chapters as $i => $ch) {
+        if ($ch->ID == $chapter_id) {
+            if (isset($chapters[$i - 1])) $prev_id = $chapters[$i - 1]->ID;
+            if (isset($chapters[$i + 1])) $next_id = $chapters[$i + 1]->ID;
+            break;
+        }
+    }
+
+    $user_lt = 0;
+    if (is_user_logged_in()) {
+        $user_lt = get_user_meta(get_current_user_id(), '_linh_thach', true) ?: 0;
+    }
+
+    wp_send_json_success([
+        'id' => $chapter_id,
+        'title' => $chapter->post_title,
+        'chapter_num' => $chapter_num,
+        'content' => $chapter_content,
+        'can_read' => $can_read,
+        'login_required' => $login_required,
+        'purchase_required' => $purchase_required,
+        'is_vip' => $is_vip === '1',
+        'vip_price' => $vip_price,
+        'audio_url' => $audio_url,
+        'permalink' => get_permalink($chapter_id),
+        'prev_id' => $prev_id,
+        'next_id' => $next_id,
+        'user_lt' => $user_lt,
+    ]);
+}
+
 // ==================== SOCIAL LOGIN (OAUTH) ====================
 add_action('init', 'ta_oauth_rewrite');
 function ta_oauth_rewrite() {
