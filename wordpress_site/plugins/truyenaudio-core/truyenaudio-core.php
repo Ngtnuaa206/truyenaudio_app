@@ -673,7 +673,6 @@ function ta_ajax_delete_chapter_admin() {
 function ta_can_read_chapter($chapter_id, $story_id = null) {
     if (!$story_id) $story_id = get_post_meta($chapter_id, '_story_id', true);
     $is_vip = get_post_meta($chapter_id, '_is_vip', true);
-    if (current_user_can('administrator')) return true;
     if (!is_user_logged_in()) return false;
     if ($is_vip !== '1') return true;
     return ta_has_purchased($chapter_id);
@@ -1454,7 +1453,6 @@ function ta_rest_purchase_vip($request) {
 function ta_has_purchased($chapter_id, $user_id = null) {
     if (!$user_id) $user_id = get_current_user_id();
     if (!$user_id) return false;
-    if (current_user_can('administrator')) return true;
     $purchased = get_user_meta($user_id, '_purchased_chapters', true) ?: [];
     return in_array($chapter_id, $purchased);
 }
@@ -2094,3 +2092,50 @@ add_filter('wp_rest_prepare_user', function($response, $user, $request) {
     }
     return $response;
 }, 10, 3);
+
+// ==================== GOOGLE TTS PROXY ====================
+add_action('wp_ajax_ta_tts', 'ta_tts_proxy');
+add_action('wp_ajax_nopriv_ta_tts', 'ta_tts_proxy');
+function ta_tts_proxy() {
+    $text = sanitize_text_field(wp_unslash($_POST['text'] ?? ''));
+    if (empty($text)) {
+        wp_send_json_error('No text');
+    }
+
+    $cache_key = 'ta_tts_' . md5($text);
+    $cached = get_transient($cache_key);
+    if ($cached !== false) {
+        header('Content-Type: audio/mpeg');
+        header('Cache-Control: public, max-age=604800');
+        echo $cached;
+        exit;
+    }
+
+    $url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=' . rawurlencode($text);
+
+    $response = wp_remote_get($url, [
+        'timeout' => 15,
+        'headers' => [
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer' => 'https://translate.google.com/',
+        ],
+    ]);
+
+    if (is_wp_error($response)) {
+        wp_send_json_error($response->get_error_message());
+    }
+
+    $body = wp_remote_retrieve_body($response);
+    $code = wp_remote_retrieve_response_code($response);
+
+    if ($code !== 200 || empty($body)) {
+        wp_send_json_error('TTS failed: ' . $code);
+    }
+
+    set_transient($cache_key, $body, 7 * DAY_IN_SECONDS);
+
+    header('Content-Type: audio/mpeg');
+    header('Cache-Control: public, max-age=604800');
+    echo $body;
+    exit;
+}

@@ -43,26 +43,42 @@ $is_admin = in_array('administrator', (array) $user->roles);
     </div>
     <?php endif; ?>
 
-    <?php if (!empty($history)): $history = array_reverse($history); ?>
+    <?php if (!empty($history)): $history = array_reverse($history, true); ?>
     <div class="profile-card">
         <h3>📖 Đọc gần đây</h3>
         <div class="story-list">
-            <?php $count = 0; foreach ($history as $sid => $hdata): if ($count++ >= 5) break; $story = get_post($sid); if (!$story) continue; ?>
+            <?php $count = 0; foreach ($history as $sid => $hdata): if ($count++ >= 5) break; $story = get_post($sid); if (!$story) continue;
+                $chapter_id = intval($hdata['chapter_id']);
+                $ch = get_post($chapter_id);
+                $chapter_num = $ch ? get_post_meta($ch->ID, '_chapter_number', true) : '';
+            ?>
             <div class="story-row">
                 <div class="story-thumb">
-                    <a href="<?php echo get_permalink($hdata['chapter_id']); ?>">
-                        <?php if (has_post_thumbnail($sid)) echo get_the_post_thumbnail($sid, 'medium'); else echo '<div style="width:80px;height:110px;display:flex;align-items:center;justify-content:center;color:#555;background:#2a2a4e;border-radius:8px;">📚</div>'; ?>
+                    <a href="<?php echo $ch ? get_permalink($ch->ID) : get_permalink($sid); ?>">
+                        <?php if (has_post_thumbnail($sid)) echo get_the_post_thumbnail($sid, 'medium'); else echo '<div style="width:80px;height:110px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);background:var(--border);border-radius:8px;">📚</div>'; ?>
                     </a>
                 </div>
                 <div class="story-info">
-                    <a href="<?php echo get_permalink($sid); ?>"><h3 class="story-title"><?php echo $story->post_title; ?></h3></a>
+                    <a href="<?php echo get_permalink($sid); ?>"><h3 class="story-title"><?php echo esc_html($story->post_title); ?></h3></a>
+                    <?php if ($ch): ?>
+                    <div style="margin-top:4px;">
+                        <a href="<?php echo get_permalink($ch->ID); ?>" style="color:var(--accent);font-size:13px;">
+                            <?php echo $chapter_num ? 'Chương ' . $chapter_num . ': ' : ''; ?><?php echo esc_html($ch->post_title); ?> →
+                        </a>
+                    </div>
+                    <?php endif; ?>
                     <div class="story-meta">
-                        <span>Đọc lúc: <?php echo $hdata['time']; ?></span>
+                        <span style="font-size:12px;color:var(--text-muted);">Đọc lúc: <?php echo date('d/m/Y H:i', strtotime($hdata['time'])); ?></span>
                     </div>
                 </div>
             </div>
             <?php endforeach; ?>
         </div>
+        <?php if ($count >= 5): ?>
+        <div style="text-align:center;margin-top:12px;">
+            <a href="<?php echo home_url('/lich-su'); ?>" style="color:var(--accent);font-size:13px;">Xem tất cả →</a>
+        </div>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 </div>

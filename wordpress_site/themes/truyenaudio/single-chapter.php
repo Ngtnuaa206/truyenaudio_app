@@ -1,5 +1,5 @@
 <?php get_header(); the_post();
-$story_id = get_post_meta(get_the_ID(), '_story_id', true);
+$story_id = get_post_meta(get_the_ID(), '_story_id', true) ?: get_post()->post_parent;
 $chapter_num = get_post_meta(get_the_ID(), '_chapter_number', true);
 $audio_url = get_post_meta(get_the_ID(), '_audio_url', true);
 $is_vip = get_post_meta(get_the_ID(), '_is_vip', true);
@@ -114,6 +114,9 @@ if ($can_read && is_user_logged_in() && $story_id) {
                 </div>
                 <div class="setting-divider"></div>
                 <div class="setting-group">
+                    <button class="setting-btn" id="tts-btn" title="Đọc truyện">🔊</button>
+                </div>
+                <div class="setting-group">
                     <button class="setting-btn" id="auto-scroll-btn" title="Tự động cuộn">↕️</button>
                 </div>
                 <button class="setting-btn fullscreen-btn" id="fullscreen-btn" title="Toàn màn hình">⛶</button>
@@ -129,6 +132,7 @@ if ($can_read && is_user_logged_in() && $story_id) {
                                 <option value="3">3.0</option>
                             </select>
                         </div>
+                        <button class="setting-btn" id="tts-btn-exp" title="Đọc truyện">🔊</button>
                         <button class="setting-btn" id="auto-scroll-btn-exp" title="Tự động cuộn">↕️</button>
                         <button class="setting-btn fullscreen-btn" id="fullscreen-btn-exp" title="Toàn màn hình">⛶</button>
                     </div>
@@ -526,7 +530,6 @@ jQuery(function($) {
         applyReadingTheme(readingTheme);
         $('#theme-light').on('click', function(){applyReadingTheme('light');});
         $('#theme-dark').on('click', function(){applyReadingTheme('dark');});
-        $('#theme-sepia').on('click', function(){applyReadingTheme('sepia');});
         function applyReadingTheme(theme){document.documentElement.setAttribute('data-theme',theme);localStorage.setItem('ta_reading_theme',theme);$('.setting-btn[id^="theme-"]').removeClass('active');$('#theme-'+theme).addClass('active');}
         var autoScrollInterval = null;
         $('#auto-scroll-btn, #auto-scroll-btn-exp').on('click', function(){
@@ -548,8 +551,124 @@ jQuery(function($) {
         $('#settings-more-btn').on('click', function(e){
             e.stopPropagation();
             $('#settings-expanded').toggleClass('show');
+            if (ttsPlaying) {
+                if (ttsPaused) {
+                    $('#tts-btn-exp').addClass('active').text('▶️');
+                } else {
+                    $('#tts-btn-exp').addClass('active').text('⏹');
+                }
+            }
         });
         $(document).on('click', function(){ $('#settings-expanded').removeClass('show'); });
+
+        // ========== Vietnamese TTS (Google TTS via AJAX) ==========
+        var ttsChunkSize = 150;
+        var ttsChunks = [];
+        var ttsIndex = 0;
+        var ttsPlaying = false;
+        var ttsPaused = false;
+        var ttsAudio = null;
+        var ttsAjaxPending = null;
+
+        function chunkText(text) {
+            var chunks = [];
+            var sentences = text.replace(/\n+/g, ' ').split(/(?<=[.!?])\s+/);
+            var current = '';
+            for (var i = 0; i < sentences.length; i++) {
+                var test = current ? current + ' ' + sentences[i] : sentences[i];
+                if (test.length > ttsChunkSize && current) {
+                    chunks.push(current.trim());
+                    current = sentences[i];
+                } else {
+                    current = test;
+                }
+            }
+            if (current.trim()) chunks.push(current.trim());
+            return chunks;
+        }
+
+        function ttsSpeakChunk() {
+            if (!ttsPlaying || ttsIndex >= ttsChunks.length) {
+                ttsStop();
+                return;
+            }
+            var chunk = ttsChunks[ttsIndex];
+            var $allBtns = $('#tts-btn, #tts-btn-exp');
+            $allBtns.text('⏳');
+
+            ttsAjaxPending = $.ajax({
+                url: TA_ChapterData.ajax_url,
+                type: 'POST',
+                data: { action: 'ta_tts', text: chunk },
+                xhrFields: { responseType: 'blob' },
+                success: function(blob) {
+                    if (!ttsPlaying) return;
+                    if (ttsAudio) { ttsAudio.pause(); }
+                    var url = URL.createObjectURL(blob);
+                    ttsAudio = new Audio(url);
+                    $allBtns.text('⏹');
+
+                    ttsAudio.onended = function() {
+                        URL.revokeObjectURL(url);
+                        ttsIndex++;
+                        ttsSpeakChunk();
+                    };
+                    ttsAudio.onerror = function() {
+                        URL.revokeObjectURL(url);
+                        ttsIndex++;
+                        ttsSpeakChunk();
+                    };
+                    ttsAudio.play().catch(function() {
+                        ttsIndex++;
+                        ttsSpeakChunk();
+                    });
+                },
+                error: function() {
+                    if (!ttsPlaying) return;
+                    ttsIndex++;
+                    ttsSpeakChunk();
+                }
+            });
+        }
+
+        function ttsStop() {
+            if (ttsAjaxPending) { ttsAjaxPending.abort(); ttsAjaxPending = null; }
+            if (ttsAudio) { ttsAudio.pause(); ttsAudio = null; }
+            ttsPlaying = false;
+            ttsPaused = false;
+            ttsIndex = 0;
+            ttsChunks = [];
+            $('#tts-btn, #tts-btn-exp').removeClass('active').text('🔊');
+        }
+
+        $('#tts-btn, #tts-btn-exp').on('click', function() {
+            var $allBtns = $('#tts-btn, #tts-btn-exp');
+            if (!ttsPlaying) {
+                var content = document.getElementById('reader-content');
+                if (!content) { ta_toast('Không tìm thấy nội dung chương!', 'error'); return; }
+                var text = content.innerText || content.textContent;
+                if (!text || text.trim().length < 10) { ta_toast('Nội dung quá ngắn để đọc.', 'info'); return; }
+                ttsChunks = chunkText(text);
+                ttsIndex = 0;
+                ttsPlaying = true;
+                ttsPaused = false;
+                $allBtns.addClass('active');
+                ta_toast('Đang tải giọng đọc...', 'info');
+                ttsSpeakChunk();
+            } else if (ttsPaused) {
+                if (ttsAudio) ttsAudio.play();
+                ttsPaused = false;
+                $allBtns.text('⏹');
+            } else if (ttsAudio && !ttsAudio.paused) {
+                ttsAudio.pause();
+                ttsPaused = true;
+                $allBtns.text('▶️');
+            } else {
+                ttsStop();
+            }
+        });
+
+        $(window).on('beforeunload', function() { ttsStop(); });
     }
 });
 </script>
