@@ -47,44 +47,90 @@ if ($can_read && is_user_logged_in() && $story_id) {
             <?php endif; ?>
 
             <!-- Audio Player -->
-            <?php if ($audio_url): ?>
+            <?php if ($audio_url):
+                $cover_url = '';
+                if ($story && has_post_thumbnail($story->ID)) {
+                    $thumb = wp_get_attachment_image_src(get_post_thumbnail_id($story->ID), 'medium');
+                    if ($thumb) $cover_url = $thumb[0];
+                }
+            ?>
             <div class="audio-player-section" id="audio-player-section">
-                <div class="audio-player-title">🎧 Nghe chương này</div>
-                <div class="audio-progress" id="audio-progress">
-                    <div class="audio-progress-fill" id="audio-progress-fill"></div>
-                </div>
-                <div class="audio-time">
-                    <span id="audio-current-time">0:00</span>
-                    <span id="audio-duration">0:00</span>
-                </div>
-                <div class="audio-controls">
-                    <button class="audio-btn" id="audio-prev" title="Quay lại 10s">⏪</button>
-                    <button class="audio-btn play-btn" id="audio-play" title="Phát/Tạm dừng">
-                        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    </button>
-                    <button class="audio-btn" id="audio-next" title="Tua 10s">⏩</button>
-                </div>
-                <div class="audio-extras">
-                    <div class="speed-control">
-                        <button class="speed-btn" data-speed="0.75">0.75x</button>
-                        <button class="speed-btn active" data-speed="1">1x</button>
-                        <button class="speed-btn" data-speed="1.25">1.25x</button>
-                        <button class="speed-btn" data-speed="1.5">1.5x</button>
-                        <button class="speed-btn" data-speed="2">2x</button>
+                <audio id="audio-element" src="<?php echo esc_url($audio_url); ?>" preload="auto"></audio>
+                <div class="ap-inner">
+                    <div class="ap-cover" id="ap-cover">
+                        <?php if ($cover_url): ?>
+                            <img src="<?php echo esc_url($cover_url); ?>" alt="cover" />
+                        <?php else: ?>
+                            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;">📚</div>
+                        <?php endif; ?>
+                        <div class="ap-cover-dot"></div>
                     </div>
-                    <div class="sleep-timer" style="position:relative;">
-                        <button class="sleep-btn" id="sleep-timer-btn">⏰ Hẹn giờ</button>
-                        <div class="sleep-popup" id="sleep-popup">
-                            <div class="sleep-popup-title">Tắt âm thanh sau</div>
-                            <button data-minutes="15">15 phút</button>
-                            <button data-minutes="30">30 phút</button>
-                            <button data-minutes="60">60 phút</button>
-                            <button data-minutes="0">Tắt hẹn giờ</button>
+                    <div class="ap-body">
+                        <div class="ap-info">
+                            <h3 class="ap-title">Chương <?php echo $chapter_num ?: ''; ?>: <?php the_title(); ?></h3>
+                            <span class="ap-speed-badge" id="ap-speed-badge">1.3x</span>
+                        </div>
+                        <div class="ap-progress-wrap">
+                            <input type="range" class="ap-range" id="ap-range" min="0" max="100" value="0" step="0.1" />
+                            <div class="ap-times">
+                                <span id="ap-current">0:00</span>
+                                <span id="ap-duration">0:00</span>
+                            </div>
+                        </div>
+                        <div class="ap-controls">
+                            <button class="ap-ctrl-btn" id="ap-backward-step" title="Lùi 10s">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 8.5l-3.5 3.5 3.5 3.5"/><path d="M19 12a7 7 0 1 1-2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">10</text></svg>
+                            </button>
+                            <button class="ap-ctrl-btn ap-play-btn" id="ap-play" title="Phát/Tạm dừng">
+                                <svg class="ap-icon-play" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                <svg class="ap-icon-pause" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+                            </button>
+                            <button class="ap-ctrl-btn" id="ap-forward-step" title="Tua 30s">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11.5 8.5l3.5 3.5-3.5 3.5"/><path d="M5 12a7 7 0 1 0 2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">30</text></svg>
+                            </button>
+                        </div>
+                        <div class="ap-bottom-row">
+                            <div class="ap-volume-wrap">
+                                <button class="ap-icon-btn" id="ap-volume-btn" title="Âm lượng">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8.5v7a4.49 4.49 0 0 0 2.5-3.5zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06A9 9 0 0 0 14 3.23z"/></svg>
+                                </button>
+                                <input type="range" class="ap-vol-range" id="ap-volume" min="0" max="1" step="0.05" value="1" />
+                            </div>
+                            <div class="ap-settings-wrap">
+                                <button class="ap-icon-btn" id="ap-settings-btn" title="Cài đặt">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19.14 12.94a7.07 7.07 0 0 0 .06-.94c0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.94 6.94 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+                                </button>
+                                <div class="ap-settings-popup" id="ap-settings">
+                                    <div class="ap-settings-section">
+                                        <div class="ap-settings-label">Tốc độ</div>
+                                        <div class="ap-speed-grid" id="ap-speed-grid">
+                                            <button data-speed="0.75">0.75</button>
+                                            <button data-speed="1">1</button>
+                                            <button data-speed="1.25">1.25</button>
+                                            <button data-speed="1.3" class="active">1.3</button>
+                                            <button data-speed="1.5">1.5</button>
+                                            <button data-speed="2">2</button>
+                                        </div>
+                                    </div>
+                                    <div class="ap-settings-section">
+                                        <div class="ap-settings-label">Hẹn giờ tắt</div>
+                                        <div class="ap-sleep-grid" id="ap-sleep-grid">
+                                            <button data-minutes="15">15p</button>
+                                            <button data-minutes="30">30p</button>
+                                            <button data-minutes="60">60p</button>
+                                        </div>
+                                        <div class="ap-sleep-custom">
+                                            <input type="number" placeholder="Phút..." id="ap-sleep-input" min="1" max="480" />
+                                            <button id="ap-sleep-set">Đặt</button>
+                                        </div>
+                                        <button id="ap-sleep-off" class="ap-sleep-off-btn">Tắt hẹn giờ</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <audio id="audio-element" src="<?php echo esc_url($audio_url); ?>"></audio>
             <?php endif; ?>
 
             <!-- Reading Settings -->
@@ -370,33 +416,27 @@ jQuery(function($) {
             var $audioSection = $('#audio-player-section');
             var $audioEl = $('#audio-element');
             if (d.audio_url) {
+                var coverHtml = d.cover_url ? '<img src="' + d.cover_url + '" alt="cover" />' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;">📚</div>';
                 if (!$audioSection.length) {
-                    // Create audio section
                     $contentArea.before(
                         '<div class="audio-player-section" id="audio-player-section">' +
-                        '<div class="audio-player-title">🎧 Nghe chương này</div>' +
-                        '<div class="audio-progress" id="audio-progress"><div class="audio-progress-fill" id="audio-progress-fill"></div></div>' +
-                        '<div class="audio-time"><span id="audio-current-time">0:00</span><span id="audio-duration">0:00</span></div>' +
-                        '<div class="audio-controls">' +
-                        '<button class="audio-btn" id="audio-prev" title="Quay lại 10s">⏪</button>' +
-                        '<button class="audio-btn play-btn" id="audio-play" title="Phát/Tạm dừng"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>' +
-                        '<button class="audio-btn" id="audio-next" title="Tua 10s">⏩</button>' +
+                        '<audio id="audio-element" preload="auto"></audio>' +
+                        '<div class="ap-inner">' +
+                        '<div class="ap-cover" id="ap-cover">' + coverHtml + '<div class="ap-cover-dot"></div></div>' +
+                        '<div class="ap-body">' +
+                        '<div class="ap-info"><h3 class="ap-title" id="ap-title">Chương ' + (d.chapter_num||'') + ': ' + d.title + '</h3><span class="ap-speed-badge" id="ap-speed-badge">1.3x</span></div>' +
+                        '<div class="ap-progress-wrap"><input type="range" class="ap-range" id="ap-range" min="0" max="100" value="0" step="0.1" /><div class="ap-times"><span id="ap-current">0:00</span><span id="ap-duration">0:00</span></div></div>' +
+                        '<div class="ap-controls">' +
+                        '<button class="ap-ctrl-btn" id="ap-backward-step" title="Lùi 10s"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 8.5l-3.5 3.5 3.5 3.5"/><path d="M19 12a7 7 0 1 1-2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">10</text></svg></button>' +
+                        '<button class="ap-ctrl-btn ap-play-btn" id="ap-play" title="Phát/Tạm dừng"><svg class="ap-icon-play" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><svg class="ap-icon-pause" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>' +
+                        '<button class="ap-ctrl-btn" id="ap-forward-step" title="Tua 30s"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11.5 8.5l3.5 3.5-3.5 3.5"/><path d="M5 12a7 7 0 1 0 2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">30</text></svg></button>' +
                         '</div>' +
-                        '<div class="audio-extras">' +
-                        '<div class="speed-control">' +
-                        '<button class="speed-btn" data-speed="0.75">0.75x</button>' +
-                        '<button class="speed-btn active" data-speed="1">1x</button>' +
-                        '<button class="speed-btn" data-speed="1.25">1.25x</button>' +
-                        '<button class="speed-btn" data-speed="1.5">1.5x</button>' +
-                        '<button class="speed-btn" data-speed="2">2x</button>' +
-                        '</div>' +
-                        '<div class="sleep-timer" style="position:relative;">' +
-                        '<button class="sleep-btn" id="sleep-timer-btn">⏰ Hẹn giờ</button>' +
-                        '<div class="sleep-popup" id="sleep-popup"><div class="sleep-popup-title">Tắt âm thanh sau</div>' +
-                        '<button data-minutes="15">15 phút</button><button data-minutes="30">30 phút</button><button data-minutes="60">60 phút</button><button data-minutes="0">Tắt hẹn giờ</button>' +
-                        '</div></div></div></div>'
+                        '<div class="ap-bottom-row"><div class="ap-volume-wrap"><button class="ap-icon-btn" id="ap-volume-btn" title="Âm lượng"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8.5v7a4.49 4.49 0 0 0 2.5-3.5zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06A9 9 0 0 0 14 3.23z"/></svg></button><input type="range" class="ap-vol-range" id="ap-volume" min="0" max="1" step="0.05" value="1" /></div>' +
+                        '<div class="ap-settings-wrap"><button class="ap-icon-btn" id="ap-settings-btn" title="Cài đặt"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19.14 12.94a7.07 7.07 0 0 0 .06-.94c0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.94 6.94 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>' +
+                        '<div class="ap-settings-popup" id="ap-settings"><div class="ap-settings-section"><div class="ap-settings-label">Tốc độ</div><div class="ap-speed-grid" id="ap-speed-grid"><button data-speed="0.75">0.75</button><button data-speed="1">1</button><button data-speed="1.25">1.25</button><button data-speed="1.3" class="active">1.3</button><button data-speed="1.5">1.5</button><button data-speed="2">2</button></div></div>' +
+                        '<div class="ap-settings-section"><div class="ap-settings-label">Hẹn giờ tắt</div><div class="ap-sleep-grid" id="ap-sleep-grid"><button data-minutes="15">15p</button><button data-minutes="30">30p</button><button data-minutes="60">60p</button></div><div class="ap-sleep-custom"><input type="number" placeholder="Phút..." id="ap-sleep-input" min="1" max="480" /><button id="ap-sleep-set">Đặt</button></div><button id="ap-sleep-off" class="ap-sleep-off-btn">Tắt hẹn giờ</button></div></div>' +
+                        '</div></div></div></div></div>'
                     );
-                    if (!$audioEl.length) $contentArea.before('<audio id="audio-element"></audio>');
                     $audioEl = $('#audio-element');
                     initAudioPlayer();
                 }
@@ -404,7 +444,13 @@ jQuery(function($) {
                 $audioEl.attr('src', d.audio_url);
                 $audioEl[0].load();
                 $audioSection.show();
+                $('#ap-title').text('Chương ' + (d.chapter_num || '') + ': ' + d.title);
                 $('#sticky-title').text('Chương ' + (d.chapter_num || '') + ': ' + d.title);
+                // Apply saved speed
+                var savedSpeed = localStorage.getItem('ta_audio_speed') || '1.3';
+                $audioEl[0].playbackRate = parseFloat(savedSpeed);
+                $('#ap-speed-badge').text(savedSpeed + 'x');
+                $('#ap-speed-grid button').removeClass('active').filter('[data-speed="'+savedSpeed+'"]').addClass('active');
             } else {
                 $audioSection.hide();
                 if ($audioEl.length) $audioEl[0].pause();
@@ -454,61 +500,151 @@ jQuery(function($) {
         var audio = document.getElementById('audio-element');
         if (!audio) return;
 
-        var $playBtn = $('#audio-play');
-        var $progress = $('#audio-progress');
-        var $progressFill = $('#audio-progress-fill');
-        var $currentTime = $('#audio-current-time');
-        var $duration = $('#audio-duration');
+        var $playBtn = $('#ap-play');
+        var $iconPlay = $playBtn.find('.ap-icon-play');
+        var $iconPause = $playBtn.find('.ap-icon-pause');
+        var $range = $('#ap-range');
+        var $current = $('#ap-current');
+        var $duration = $('#ap-duration');
+        var $cover = $('#ap-cover');
         var $stickyBar = $('#sticky-audio-bar');
         var $stickyPlay = $('#sticky-play');
         var $stickyFill = $('#sticky-progress-fill');
 
-        function formatTime(s) { var m = Math.floor(s/60); var sec = Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
+        var defaultSpeed = '1.3';
+
+        function formatTime(s) {
+            if (!s || isNaN(s)) return '0:00';
+            var h = Math.floor(s / 3600);
+            var m = Math.floor((s % 3600) / 60);
+            var sec = Math.floor(s % 60);
+            if (h > 0) return h + ':' + (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+            return m + ':' + (sec < 10 ? '0' : '') + sec;
+        }
+
+        function updateSliderBackground() {
+            var pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+            var accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#6366f1';
+            var border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#333';
+            $range[0].style.background = 'linear-gradient(to right, ' + accent + ' ' + pct + '%, ' + border + ' ' + pct + '%)';
+        }
 
         function updateProgress() {
             if (audio.duration) {
-                var pct = (audio.currentTime / audio.duration) * 100;
-                $progressFill.css('width', pct+'%');
-                $stickyFill.css('width', pct+'%');
-                $currentTime.text(formatTime(audio.currentTime));
+                $range.val((audio.currentTime / audio.duration) * 100);
+                $current.text(formatTime(audio.currentTime));
+                $stickyFill.css('width', (audio.currentTime / audio.duration) * 100 + '%');
+                updateSliderBackground();
             }
         }
 
-        function togglePlay() {
-            if (audio.paused) { audio.play(); $playBtn.html('<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>'); $stickyPlay.text('⏸'); $stickyBar.addClass('show'); }
-            else { audio.pause(); $playBtn.html('<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'); $stickyPlay.text('▶'); }
+        function setPlayState() {
+            $iconPlay.hide();
+            $iconPause.show();
+            $cover.addClass('spinning');
+            $stickyPlay.text('⏸');
+            $stickyBar.addClass('show');
         }
 
+        function setPauseState() {
+            $iconPlay.show();
+            $iconPause.hide();
+            $cover.removeClass('spinning');
+            $stickyPlay.text('▶');
+        }
+
+        function togglePlay() {
+            if (audio.paused) { audio.play(); setPlayState(); }
+            else { audio.pause(); setPauseState(); }
+        }
+
+        // Apply saved speed
+        var savedSpeed = localStorage.getItem('ta_audio_speed') || defaultSpeed;
+        audio.playbackRate = parseFloat(savedSpeed);
+        $('#ap-speed-badge').text(savedSpeed + 'x');
+        $('#ap-speed-grid button').removeClass('active').filter('[data-speed="' + savedSpeed + '"]').addClass('active');
+
+        // Events
         $playBtn.off('click').on('click', togglePlay);
         $stickyPlay.off('click').on('click', togglePlay);
-        $progress.off('click').on('click', function(e) { var r = this.getBoundingClientRect(); audio.currentTime = ((e.clientX-r.left)/r.width)*audio.duration; });
+
         audio.removeEventListener('timeupdate', updateProgress);
         audio.addEventListener('timeupdate', updateProgress);
-        audio.removeEventListener('loadedmetadata', function(){ $duration.text(formatTime(audio.duration)); });
-        audio.addEventListener('loadedmetadata', function(){ $duration.text(formatTime(audio.duration)); });
-        $('#audio-prev').off('click').on('click', function(){ audio.currentTime = Math.max(0, audio.currentTime-10); });
-        $('#audio-next').off('click').on('click', function(){ audio.currentTime = Math.min(audio.duration, audio.currentTime+10); });
+        audio.removeEventListener('loadedmetadata', function(){});
+        audio.addEventListener('loadedmetadata', function(){
+            $duration.text(formatTime(audio.duration));
+            updateSliderBackground();
+        });
+
+        audio.addEventListener('play', setPlayState);
+        audio.addEventListener('pause', setPauseState);
+
+        // Range seek
+        $range.off('input').on('input', function(){
+            if (audio.duration) {
+                audio.currentTime = ($range.val() / 100) * audio.duration;
+                updateSliderBackground();
+            }
+        });
+
+        // Backward 10s / Forward 30s
+        $('#ap-backward-step').off('click').on('click', function(){ audio.currentTime = Math.max(0, audio.currentTime - 10); });
+        $('#ap-forward-step').off('click').on('click', function(){ audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 30); });
 
         // Speed
-        $('.speed-btn').off('click').on('click', function(){ var sp = $(this).data('speed'); audio.playbackRate = sp; $('.speed-btn').removeClass('active'); $(this).addClass('active'); localStorage.setItem('ta_audio_speed', sp); });
-        var savedSpeed = localStorage.getItem('ta_audio_speed');
-        if (savedSpeed) { audio.playbackRate = parseFloat(savedSpeed); $('.speed-btn').removeClass('active'); $('.speed-btn[data-speed="'+savedSpeed+'"]').addClass('active'); }
+        $('#ap-speed-grid').off('click', 'button').on('click', 'button', function(){
+            var sp = $(this).data('speed');
+            audio.playbackRate = sp;
+            localStorage.setItem('ta_audio_speed', sp);
+            $('#ap-speed-grid button').removeClass('active');
+            $(this).addClass('active');
+            $('#ap-speed-badge').text(sp + 'x');
+        });
+
+        // Volume
+        $('#ap-volume').off('input').on('input', function(){
+            audio.volume = parseFloat($(this).val());
+        });
+
+        // Settings popup toggle
+        $('#ap-settings-btn').off('click').on('click', function(e){
+            e.stopPropagation();
+            $('#ap-settings').toggleClass('show');
+        });
+        $(document).off('click.apSettings').on('click.apSettings', function(){ $('#ap-settings').removeClass('show'); });
 
         // Sleep timer
-        $('#sleep-timer-btn').off('click').on('click', function(e){ e.stopPropagation(); $('#sleep-popup').toggleClass('show'); });
-        $(document).off('click.sleepPopup').on('click.sleepPopup', function(){ $('#sleep-popup').removeClass('show'); });
-        $('.sleep-popup button').off('click').on('click', function(){
+        $('#ap-sleep-grid button').off('click').on('click', function(){
             var min = $(this).data('minutes');
-            clearInterval(window._sleepTimer); window._sleepTimer = null;
-            $('.sleep-btn').removeClass('active');
-            if (min > 0) {
-                window._sleepEnd = Date.now() + min*60*1000;
-                $('.sleep-btn').addClass('active');
-                ta_toast('Hẹn giờ '+min+' phút', 'info');
-                window._sleepTimer = setInterval(function(){ if (Date.now() >= window._sleepEnd) { audio.pause(); clearInterval(window._sleepTimer); window._sleepTimer = null; $('.sleep-btn').removeClass('active'); ta_toast('Đã tắt âm thanh theo hẹn giờ', 'info'); } }, 1000);
-            } else { ta_toast('Đã tắt hẹn giờ', 'info'); }
-            $('#sleep-popup').removeClass('show');
+            startSleepTimer(min);
+            $('#ap-sleep-grid button').removeClass('active');
+            $(this).addClass('active');
         });
+        $('#ap-sleep-set').off('click').on('click', function(){
+            var min = parseInt($('#ap-sleep-input').val());
+            if (min > 0) {
+                startSleepTimer(min);
+                $('#ap-sleep-grid button').removeClass('active');
+            }
+        });
+        $('#ap-sleep-off').off('click').on('click', function(){
+            clearInterval(window._sleepTimer); window._sleepTimer = null;
+            $('#ap-sleep-grid button').removeClass('active');
+            ta_toast('Đã tắt hẹn giờ', 'info');
+        });
+
+        function startSleepTimer(min) {
+            clearInterval(window._sleepTimer); window._sleepTimer = null;
+            window._sleepEnd = Date.now() + min * 60 * 1000;
+            ta_toast('Hẹn giờ ' + min + ' phút', 'info');
+            window._sleepTimer = setInterval(function(){
+                if (Date.now() >= window._sleepEnd) {
+                    audio.pause(); clearInterval(window._sleepTimer); window._sleepTimer = null;
+                    $('#ap-sleep-grid button').removeClass('active');
+                    ta_toast('Đã tắt âm thanh theo hẹn giờ', 'info');
+                }
+            }, 1000);
+        }
     }
 
     // Init audio on page load

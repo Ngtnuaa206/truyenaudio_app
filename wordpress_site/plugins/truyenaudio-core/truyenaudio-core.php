@@ -860,6 +860,7 @@ function ta_ajax_load_chapter() {
         'is_vip' => $is_vip === '1',
         'vip_price' => $vip_price,
         'audio_url' => $audio_url,
+        'cover_url' => $story_id && has_post_thumbnail($story_id) ? (wp_get_attachment_image_url(get_post_thumbnail_id($story_id), 'medium') ?: '') : '',
         'permalink' => get_permalink($chapter_id),
         'prev_id' => $prev_id,
         'next_id' => $next_id,
