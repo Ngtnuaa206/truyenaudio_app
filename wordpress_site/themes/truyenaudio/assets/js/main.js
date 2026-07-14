@@ -80,16 +80,6 @@ jQuery(function($) {
         }
     });
 
-    // Rating stars hover
-    $('.story-hero-rating .star').on('mouseenter', function() {
-        var val = $(this).data('rating');
-        $(this).closest('.story-hero-rating').find('.star').each(function() {
-            $(this).toggleClass('hover', $(this).data('rating') <= val);
-        });
-    }).on('mouseleave', function() {
-        $(this).closest('.story-hero-rating').find('.star').removeClass('hover');
-    });
-
     // ========== Audio Player ==========
     var audio = document.getElementById('audio-element');
     if (audio) {

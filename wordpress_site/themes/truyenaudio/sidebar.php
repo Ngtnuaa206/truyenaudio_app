@@ -118,7 +118,6 @@ if ($featured_query->have_posts()):
     <div class="sidebar-widget-title">🔥 Truyện nổi bật</div>
     <?php while ($featured_query->have_posts()): $featured_query->the_post();
         $fviews = get_post_meta(get_the_ID(), '_views', true) ?: 0;
-        $frating = get_post_meta(get_the_ID(), '_rating', true) ?: 0;
     ?>
     <a href="<?php the_permalink(); ?>" class="sidebar-story-item">
         <div class="sidebar-story-thumb">
@@ -126,7 +125,7 @@ if ($featured_query->have_posts()):
         </div>
         <div class="sidebar-story-info">
             <div class="sidebar-story-title"><?php the_title(); ?></div>
-            <div class="sidebar-story-meta">👁 <?php echo ta_format_views($fviews); ?> · ⭐ <?php echo number_format($frating, 1); ?></div>
+            <div class="sidebar-story-meta">👁 <?php echo ta_format_views($fviews); ?></div>
         </div>
     </a>
     <?php endwhile; wp_reset_postdata(); ?>
@@ -138,7 +137,7 @@ if ($featured_query->have_posts()):
 $ranking_args = [
     'post_type' => 'truyen',
     'posts_per_page' => 10,
-    'meta_key' => '_rating_count',
+    'meta_key' => '_views',
     'orderby' => 'meta_value_num',
     'order' => 'DESC',
 ];
@@ -148,14 +147,13 @@ if ($ranking_query->have_posts()):
 <div class="sidebar-widget">
     <div class="sidebar-widget-title">🏆 Bảng xếp hạng</div>
     <?php $rank = 1; while ($ranking_query->have_posts()): $ranking_query->the_post();
-        $rcount = get_post_meta(get_the_ID(), '_rating_count', true) ?: 0;
-        $rrating = get_post_meta(get_the_ID(), '_rating', true) ?: 0;
+        $rviews = get_post_meta(get_the_ID(), '_views', true) ?: 0;
     ?>
     <div class="sidebar-ranking-item">
         <span class="sidebar-rank-num <?php echo $rank <= 3 ? 'r' . $rank : ''; ?>"><?php echo $rank; ?></span>
         <a href="<?php the_permalink(); ?>" class="sidebar-story-info">
             <div class="sidebar-rank-title"><?php the_title(); ?></div>
-            <div class="sidebar-rank-meta">⭐ <?php echo number_format($rrating, 1); ?> (<?php echo $rcount; ?> đánh giá)</div>
+            <div class="sidebar-rank-meta">👁 <?php echo number_format($rviews); ?></div>
         </a>
     </div>
     <?php $rank++; endwhile; wp_reset_postdata(); ?>

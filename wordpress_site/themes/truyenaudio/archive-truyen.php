@@ -86,7 +86,6 @@
     <div class="story-grid">
         <?php while ($query->have_posts()): $query->the_post();
             $views = get_post_meta(get_the_ID(), '_views', true) ?: 0;
-            $rating = get_post_meta(get_the_ID(), '_rating', true) ?: 0;
             $chapters = ta_get_chapters(get_the_ID());
             $statuses = wp_get_post_terms(get_the_ID(), 'trang_thai');
             $has_badge = !empty($statuses) && $statuses[0]->slug == 'full';
@@ -105,7 +104,6 @@
                 <div class="story-meta">
                     <span><?php echo count($chapters); ?> Chương</span><br>
                     <span class="views">👁 <?php echo ta_views($views); ?></span>
-                    <?php echo ta_get_stars($rating); ?>
                 </div>
             </div>
         </div>

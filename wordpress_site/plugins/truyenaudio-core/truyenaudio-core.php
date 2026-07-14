@@ -54,8 +54,6 @@ function ta_register_post_types() {
 
     // Register story meta for REST API
     register_post_meta('truyen', '_views', ['show_in_rest' => true, 'type' => 'string']);
-    register_post_meta('truyen', '_rating', ['show_in_rest' => true, 'type' => 'string']);
-    register_post_meta('truyen', '_rating_count', ['show_in_rest' => true, 'type' => 'string']);
     register_post_meta('truyen', '_chapter_count', ['show_in_rest' => true, 'type' => 'string']);
     register_post_meta('truyen', '_status', ['show_in_rest' => true, 'type' => 'string']);
     register_post_meta('truyen', '_dao_linh_thach', ['show_in_rest' => true, 'type' => 'string']);
@@ -335,18 +333,11 @@ function ta_add_story_meta() {
 
 function ta_story_meta_html($post) {
     $views = get_post_meta($post->ID, '_views', true) ?: 0;
-    $rating = get_post_meta($post->ID, '_rating', true) ?: 0;
-    $rating_count = get_post_meta($post->ID, '_rating_count', true) ?: 0;
     $revenue = get_post_meta($post->ID, '_story_revenue', true) ?: 0;
     ?>
     <p>
         <label>Lượt xem:</label>
         <input type="number" name="story_views" value="<?php echo $views; ?>" style="width:100%" min="0">
-    </p>
-    <p>
-        <label>Đánh giá (/5):</label>
-        <input type="number" name="story_rating" value="<?php echo $rating; ?>" style="width:80px" min="0" max="5" step="0.1">
-        <input type="number" name="story_rating_count" value="<?php echo $rating_count; ?>" style="width:70px" min="0" placeholder="Lượt">
     </p>
     <p>
         <label>Doanh thu (💎):</label>
@@ -385,8 +376,6 @@ function ta_save_story_meta($post_id) {
     if (!current_user_can('edit_post', $post_id)) return;
 
     if (isset($_POST['story_views'])) update_post_meta($post_id, '_views', intval($_POST['story_views']));
-    if (isset($_POST['story_rating'])) update_post_meta($post_id, '_rating', floatval($_POST['story_rating']));
-    if (isset($_POST['story_rating_count'])) update_post_meta($post_id, '_rating_count', intval($_POST['story_rating_count']));
     if (isset($_POST['story_revenue'])) update_post_meta($post_id, '_story_revenue', intval($_POST['story_revenue']));
 
     if (isset($_POST['dao_linh_thach'])) update_post_meta($post_id, '_dao_linh_thach', '1'); else update_post_meta($post_id, '_dao_linh_thach', '0');
@@ -712,27 +701,6 @@ function ta_get_chapters($story_id) {
         'order' => 'ASC',
         'numberposts' => -1,
     ]);
-}
-
-// AJAX rating
-add_action('wp_ajax_rate_story', 'ta_rate_story');
-function ta_rate_story() {
-    $post_id = intval($_POST['post_id']);
-    $rating = intval($_POST['rating']);
-    if ($rating < 1 || $rating > 5) wp_die('Invalid');
-
-    $old_rating = get_post_meta($post_id, '_rating', true) ?: 0;
-    $count = get_post_meta($post_id, '_rating_count', true) ?: 0;
-    $new_rating = (($old_rating * $count) + $rating) / ($count + 1);
-    update_post_meta($post_id, '_rating', round($new_rating, 1));
-    update_post_meta($post_id, '_rating_count', $count + 1);
-
-    $user_id = get_current_user_id();
-    $ratings = get_post_meta($post_id, '_user_ratings', true) ?: [];
-    $ratings[$user_id] = $rating;
-    update_post_meta($post_id, '_user_ratings', $ratings);
-
-    wp_send_json(['rating' => round($new_rating, 1), 'count' => $count + 1]);
 }
 
 // Bookmarks
@@ -1308,8 +1276,6 @@ function ta_rest_get_story($request) {
         'chapter_count' => count($chapters),
         'meta' => [
             '_views' => get_post_meta($id, '_views', true) ?: 0,
-            '_rating' => floatval(get_post_meta($id, '_rating', true) ?: 0),
-            '_rating_count' => intval(get_post_meta($id, '_rating_count', true) ?: 0),
             '_chapter_count' => count($chapters),
         ],
     ]);
@@ -1381,8 +1347,6 @@ function ta_rest_create_story($request) {
     if (is_wp_error($post_id)) return $post_id;
 
     update_post_meta($post_id, '_views', 0);
-    update_post_meta($post_id, '_rating', 0);
-    update_post_meta($post_id, '_rating_count', 0);
     update_post_meta($post_id, '_chapter_count', 0);
 
     $genre_ids = $request->get_param('genre_ids');

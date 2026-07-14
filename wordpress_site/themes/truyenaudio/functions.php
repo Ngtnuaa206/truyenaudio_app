@@ -114,18 +114,6 @@ function ta_pagination() {
     ]);
 }
 
-// Get story rating stars
-function ta_get_stars($rating) {
-    $html = '<span class="stars">';
-    for ($i = 1; $i <= 5; $i++) {
-        if ($i <= floor($rating)) $html .= '<span class="star filled">★</span>';
-        elseif ($i - 0.5 <= $rating) $html .= '<span class="star half">★</span>';
-        else $html .= '<span class="star">★</span>';
-    }
-    $html .= ' <small>' . number_format($rating, 1) . '</small></span>';
-    return $html;
-}
-
 // Format views
 function ta_views($count) {
     if ($count >= 1000000) return round($count / 1000000, 1) . 'M';

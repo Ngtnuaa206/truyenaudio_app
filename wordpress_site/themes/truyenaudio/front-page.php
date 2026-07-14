@@ -58,7 +58,6 @@
             $new = new WP_Query(['post_type' => 'truyen', 'posts_per_page' => 12]);
             while ($new->have_posts()): $new->the_post();
                 $views = get_post_meta(get_the_ID(), '_views', true) ?: 0;
-                $rating = get_post_meta(get_the_ID(), '_rating', true) ?: 0;
                 $terms = wp_get_post_terms(get_the_ID(), 'the_loai');
                 $chapters = ta_get_chapters(get_the_ID());
             ?>
@@ -78,7 +77,6 @@
                         <?php endif; ?>
                         <br>
                         <span class="views"><?php echo ta_views($views); ?> views</span>
-                        <?php echo ta_get_stars($rating); ?>
                     </div>
                 </div>
             </div>
@@ -103,7 +101,6 @@
             ]);
             while ($trending->have_posts()): $trending->the_post();
                 $views = get_post_meta(get_the_ID(), '_views', true) ?: 0;
-                $rating = get_post_meta(get_the_ID(), '_rating', true) ?: 0;
                 $terms = wp_get_post_terms(get_the_ID(), 'the_loai');
                 $chapters = ta_get_chapters(get_the_ID());
             ?>
@@ -122,7 +119,6 @@
                             <span><?php echo $terms[0]->name; ?></span>
                         <?php endif; ?>
                         <span class="views">👁 <?php echo ta_views($views); ?></span>
-                        <?php echo ta_get_stars($rating); ?>
                     </div>
                 </div>
             </div>
@@ -159,13 +155,12 @@
             $popular = new WP_Query([
                 'post_type' => 'truyen',
                 'posts_per_page' => 8,
-                'meta_key' => '_rating',
+                'meta_key' => '_views',
                 'orderby' => 'meta_value_num',
                 'order' => 'DESC',
             ]);
             while ($popular->have_posts()): $popular->the_post();
                 $views = get_post_meta(get_the_ID(), '_views', true) ?: 0;
-                $rating = get_post_meta(get_the_ID(), '_rating', true) ?: 0;
                 $chapters = ta_get_chapters(get_the_ID());
             ?>
             <div class="story-card">
@@ -179,7 +174,6 @@
                     <div class="story-meta">
                         <span><?php echo count($chapters); ?> Chương</span>
                         <span class="views"><?php echo ta_views($views); ?> views</span>
-                        <?php echo ta_get_stars($rating); ?>
                     </div>
                 </div>
             </div>

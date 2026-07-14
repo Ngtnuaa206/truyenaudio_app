@@ -1,16 +1,11 @@
 <?php get_header(); the_post(); ?>
 <?php
 $views = get_post_meta(get_the_ID(), '_views', true) ?: 0;
-$rating = get_post_meta(get_the_ID(), '_rating', true) ?: 0;
-$rating_count = get_post_meta(get_the_ID(), '_rating_count', true) ?: 0;
 $chapters = ta_get_chapters(get_the_ID());
 $genres = wp_get_post_terms(get_the_ID(), 'the_loai');
 $statuses = wp_get_post_terms(get_the_ID(), 'trang_thai');
-$user_rating = 0;
 $is_bookmarked = false;
 if (is_user_logged_in()) {
-    $ratings = get_post_meta(get_the_ID(), '_user_ratings', true) ?: [];
-    $user_rating = isset($ratings[get_current_user_id()]) ? $ratings[get_current_user_id()] : 0;
     $bookmarks = get_user_meta(get_current_user_id(), '_bookmarks', true) ?: [];
     $is_bookmarked = in_array(get_the_ID(), $bookmarks);
 }
@@ -36,15 +31,6 @@ if (is_user_logged_in()) {
                             <?php if (get_post_meta(get_the_ID(), '_dao_linh_thach', true) === '1'): ?>
                                 <span class="meta-tag" style="background:#e74c3c;color:#fff;">🔥 Đào Linh Thạch</span>
                             <?php endif; ?>
-                        </div>
-
-                        <div class="story-hero-rating" data-post-id="<?php the_ID(); ?>">
-                            <div class="stars">
-                                <?php for ($i = 1; $i <= 5; $i++): ?>
-                                    <span class="star <?php echo $i <= $user_rating ? 'active' : ''; ?>" data-rating="<?php echo $i; ?>">★</span>
-                                <?php endfor; ?>
-                            </div>
-                            <span class="rating-text"><?php echo $rating; ?>/5 (<?php echo $rating_count; ?> đánh giá)</span>
                         </div>
 
                         <div class="story-hero-actions">
@@ -161,26 +147,6 @@ if (is_user_logged_in()) {
 
 <script>
 jQuery(function($) {
-    // Rating
-    $('.story-hero-rating .star').on('click', function() {
-        var rating = $(this).data('rating');
-        var post_id = $('.story-hero-rating').data('post-id');
-        var $box = $(this).closest('.story-hero-rating');
-        $.post(ta_ajax.ajax_url, {
-            action: 'rate_story',
-            post_id: post_id,
-            rating: rating
-        }, function(res) {
-            $box.find('.star').each(function() {
-                $(this).toggleClass('active', $(this).data('rating') <= res.rating);
-            });
-            $box.find('.rating-text').text(res.rating + '/5 (' + res.count + ' đánh giá)');
-            ta_toast('Cảm ơn bạn đã đánh giá!', 'success');
-        }).fail(function() {
-            ta_toast('Đánh giá thất bại, vui lòng thử lại.', 'error');
-        });
-    });
-
     // Bookmark
     $('.bookmark-btn').on('click', function() {
         var $btn = $(this);
