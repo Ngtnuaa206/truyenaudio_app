@@ -20,7 +20,7 @@ function ta_register_post_types() {
         'has_archive' => true,
         'menu_icon' => 'dashicons-book',
         'menu_position' => 5,
-        'supports' => ['title', 'editor', 'thumbnail', 'excerpt', 'author'],
+        'supports' => ['title', 'editor', 'thumbnail', 'author'],
         'rewrite' => ['slug' => 'truyen'],
         'show_in_rest' => true,
         'show_in_menu' => true,
@@ -1268,7 +1268,6 @@ function ta_rest_get_story($request) {
     return new WP_REST_Response([
         'id' => $id,
         'title' => ['rendered' => $post->post_title],
-        'excerpt' => ['rendered' => wp_strip_all_tags($post->post_excerpt)],
         'content' => ['rendered' => apply_filters('the_content', $post->post_content)],
         'thumbnail' => $thumbnail,
         'genres' => $genres,
@@ -1332,14 +1331,12 @@ function ta_rest_create_story($request) {
     }
     $title = sanitize_text_field($request->get_param('title'));
     $content = wp_kses_post($request->get_param('content'));
-    $excerpt = sanitize_textarea_field($request->get_param('excerpt') ?? '');
     if (empty($title)) {
         return new WP_Error('missing', 'Thiếu tiêu đề', ['status' => 400]);
     }
     $post_id = wp_insert_post([
         'post_title' => $title,
         'post_content' => $content,
-        'post_excerpt' => $excerpt,
         'post_type' => 'truyen',
         'post_status' => 'draft',
         'post_author' => $user_id,

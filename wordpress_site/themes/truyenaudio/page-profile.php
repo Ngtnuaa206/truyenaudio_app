@@ -36,7 +36,6 @@ $is_admin = in_array('administrator', (array) $user->roles);
                 </div>
                 <div class="story-info">
                     <a href="<?php echo get_permalink($bid); ?>"><h3 class="story-title"><?php echo $story->post_title; ?></h3></a>
-                    <div class="story-excerpt"><?php echo wp_trim_words($story->post_excerpt, 15); ?></div>
                 </div>
             </div>
             <?php endforeach; ?>

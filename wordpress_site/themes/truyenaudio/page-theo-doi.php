@@ -25,7 +25,6 @@ $bookmarks = get_user_meta(get_current_user_id(), '_bookmarks', true) ?: [];
                 <div class="story-meta">
                     <span>📖 <?php echo count($chapters); ?> chương</span>
                 </div>
-                <div class="story-excerpt"><?php echo wp_trim_words($story->post_excerpt, 15); ?></div>
             </div>
         </div>
         <?php endforeach; ?>

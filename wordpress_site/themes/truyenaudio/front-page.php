@@ -112,7 +112,6 @@
                 </div>
                 <div class="story-info">
                     <a href="<?php the_permalink(); ?>"><h3 class="story-title"><?php the_title(); ?></h3></a>
-                    <div class="story-excerpt"><?php echo wp_trim_words(get_the_excerpt(), 20); ?></div>
                     <div class="story-meta">
                         <span><?php echo count($chapters); ?> Chương</span>
                         <?php if (!empty($terms)): ?>

@@ -114,6 +114,11 @@ function ta_pagination() {
     ]);
 }
 
+// Hide default 'Posts' menu from admin (not used - stories use 'truyen' CPT)
+add_action('admin_menu', function () {
+    remove_menu_page('edit.php');
+}, 999);
+
 // Format views
 function ta_views($count) {
     if ($count >= 1000000) return round($count / 1000000, 1) . 'M';
