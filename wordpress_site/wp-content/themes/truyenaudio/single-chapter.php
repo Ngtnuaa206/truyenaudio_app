@@ -1,5 +1,5 @@
 <?php get_header(); the_post();
-$story_id = get_post_meta(get_the_ID(), '_story_id', true);
+$story_id = get_post_meta(get_the_ID(), '_story_id', true) ?: get_post()->post_parent;
 $chapter_num = get_post_meta(get_the_ID(), '_chapter_number', true);
 $audio_url = get_post_meta(get_the_ID(), '_audio_url', true);
 $is_vip = get_post_meta(get_the_ID(), '_is_vip', true);
