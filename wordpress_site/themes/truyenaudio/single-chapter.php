@@ -345,6 +345,11 @@ jQuery(function($) {
         var chapterId = $el.closest('.chapter-item').data('chapter-id') || $el.data('chapter-id');
         if (!chapterId || chapterId == TA_ChapterData.current_chapter_id) return;
 
+        // Track if audio was playing before switch
+        var wasPlaying = false;
+        var oldAudio = document.getElementById('audio-element');
+        if (oldAudio && !oldAudio.paused && oldAudio.src) wasPlaying = true;
+
         var $contentArea = $('#chapter-content-area');
         $contentArea.css('opacity', '0.5');
 
@@ -451,6 +456,10 @@ jQuery(function($) {
                 $audioEl[0].playbackRate = parseFloat(savedSpeed);
                 $('#ap-speed-badge').text(savedSpeed + 'x');
                 $('#ap-speed-grid button').removeClass('active').filter('[data-speed="'+savedSpeed+'"]').addClass('active');
+                // Auto-play if was playing before
+                if (wasPlaying) {
+                    $audioEl[0].play().catch(function(){});
+                }
             } else {
                 $audioSection.hide();
                 if ($audioEl.length) $audioEl[0].pause();
