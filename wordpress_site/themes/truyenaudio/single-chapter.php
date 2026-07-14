@@ -67,7 +67,10 @@ if ($can_read && is_user_logged_in() && $story_id) {
                     </div>
                     <div class="ap-body">
                         <div class="ap-info">
-                            <h3 class="ap-title">Chương <?php echo $chapter_num ?: ''; ?>: <?php the_title(); ?></h3>
+                            <div style="min-width:0;">
+                                <h3 class="ap-title">Chương <?php echo $chapter_num ?: ''; ?>:</h3>
+                                <div class="ap-chapter-sub"><?php the_title(); ?></div>
+                            </div>
                             <span class="ap-speed-badge" id="ap-speed-badge">1.3x</span>
                         </div>
                         <div class="ap-progress-wrap">
@@ -78,16 +81,32 @@ if ($can_read && is_user_logged_in() && $story_id) {
                             </div>
                         </div>
                         <div class="ap-controls">
+                            <button class="ap-ctrl-btn" id="ap-shuffle" title="Phát ngẫu nhiên">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+                            </button>
+                            <button class="ap-ctrl-btn" id="ap-repeat" title="Lặp lại">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+                            </button>
+                            <?php if ($prev_chapter): ?>
+                            <button class="ap-ctrl-btn" id="ap-prev-chapter" title="Chương trước" data-chapter-id="<?php echo $prev_chapter->ID; ?>">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+                            </button>
+                            <?php endif; ?>
                             <button class="ap-ctrl-btn" id="ap-backward-step" title="Lùi 10s">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 8.5l-3.5 3.5 3.5 3.5"/><path d="M19 12a7 7 0 1 1-2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">10</text></svg>
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 8.5l-3.5 3.5 3.5 3.5"/><path d="M19 12a7 7 0 1 1-2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">10</text></svg>
                             </button>
                             <button class="ap-ctrl-btn ap-play-btn" id="ap-play" title="Phát/Tạm dừng">
                                 <svg class="ap-icon-play" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                                 <svg class="ap-icon-pause" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
                             </button>
-                            <button class="ap-ctrl-btn" id="ap-forward-step" title="Tua 30s">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11.5 8.5l3.5 3.5-3.5 3.5"/><path d="M5 12a7 7 0 1 0 2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">30</text></svg>
+                            <button class="ap-ctrl-btn" id="ap-forward-step" title="Tua 10s">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M11.5 8.5l3.5 3.5-3.5 3.5"/><path d="M5 12a7 7 0 1 0 2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">10</text></svg>
                             </button>
+                            <?php if ($next_chapter): ?>
+                            <button class="ap-ctrl-btn" id="ap-next-chapter" title="Chương tiếp" data-chapter-id="<?php echo $next_chapter->ID; ?>">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                            </button>
+                            <?php endif; ?>
                         </div>
                         <div class="ap-bottom-row">
                             <div class="ap-volume-wrap">
@@ -107,7 +126,6 @@ if ($can_read && is_user_logged_in() && $story_id) {
                                             <button data-speed="0.75">0.75</button>
                                             <button data-speed="1">1</button>
                                             <button data-speed="1.25">1.25</button>
-                                            <button data-speed="1.3" class="active">1.3</button>
                                             <button data-speed="1.5">1.5</button>
                                             <button data-speed="2">2</button>
                                         </div>
@@ -429,16 +447,20 @@ jQuery(function($) {
                         '<div class="ap-inner">' +
                         '<div class="ap-cover" id="ap-cover">' + coverHtml + '<div class="ap-cover-dot"></div></div>' +
                         '<div class="ap-body">' +
-                        '<div class="ap-info"><h3 class="ap-title" id="ap-title">Chương ' + (d.chapter_num||'') + ': ' + d.title + '</h3><span class="ap-speed-badge" id="ap-speed-badge">1.3x</span></div>' +
+                        '<div class="ap-info"><div style="min-width:0;"><h3 class="ap-title" id="ap-title">Chương ' + (d.chapter_num||'') + ':</h3><div class="ap-chapter-sub" id="ap-chapter-sub">' + d.title + '</div></div><span class="ap-speed-badge" id="ap-speed-badge">1.3x</span></div>' +
                         '<div class="ap-progress-wrap"><input type="range" class="ap-range" id="ap-range" min="0" max="100" value="0" step="0.1" /><div class="ap-times"><span id="ap-current">0:00</span><span id="ap-duration">0:00</span></div></div>' +
                         '<div class="ap-controls">' +
-                        '<button class="ap-ctrl-btn" id="ap-backward-step" title="Lùi 10s"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 8.5l-3.5 3.5 3.5 3.5"/><path d="M19 12a7 7 0 1 1-2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">10</text></svg></button>' +
+                        '<button class="ap-ctrl-btn" id="ap-shuffle" title="Phát ngẫu nhiên"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>' +
+                        '<button class="ap-ctrl-btn" id="ap-repeat" title="Lặp lại"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg></button>' +
+                        (d.prev_id ? '<button class="ap-ctrl-btn" id="ap-prev-chapter" title="Chương trước" data-chapter-id="'+d.prev_id+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>' : '') +
+                        '<button class="ap-ctrl-btn" id="ap-backward-step" title="Lùi 10s"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 8.5l-3.5 3.5 3.5 3.5"/><path d="M19 12a7 7 0 1 1-2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">10</text></svg></button>' +
                         '<button class="ap-ctrl-btn ap-play-btn" id="ap-play" title="Phát/Tạm dừng"><svg class="ap-icon-play" viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><svg class="ap-icon-pause" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="display:none;"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>' +
-                        '<button class="ap-ctrl-btn" id="ap-forward-step" title="Tua 30s"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M11.5 8.5l3.5 3.5-3.5 3.5"/><path d="M5 12a7 7 0 1 0 2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">30</text></svg></button>' +
+                        '<button class="ap-ctrl-btn" id="ap-forward-step" title="Tua 10s"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M11.5 8.5l3.5 3.5-3.5 3.5"/><path d="M5 12a7 7 0 1 0 2.1-5"/><text x="12" y="15" font-size="7" fill="currentColor" stroke="none" text-anchor="middle" font-weight="700">10</text></svg></button>' +
+                        (d.next_id ? '<button class="ap-ctrl-btn" id="ap-next-chapter" title="Chương tiếp" data-chapter-id="'+d.next_id+'"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>' : '') +
                         '</div>' +
                         '<div class="ap-bottom-row"><div class="ap-volume-wrap"><button class="ap-icon-btn" id="ap-volume-btn" title="Âm lượng"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8.5v7a4.49 4.49 0 0 0 2.5-3.5zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06A9 9 0 0 0 14 3.23z"/></svg></button><input type="range" class="ap-vol-range" id="ap-volume" min="0" max="1" step="0.05" value="1" /></div>' +
                         '<div class="ap-settings-wrap"><button class="ap-icon-btn" id="ap-settings-btn" title="Cài đặt"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19.14 12.94a7.07 7.07 0 0 0 .06-.94c0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a6.94 6.94 0 0 0-1.63-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54c-.59.24-1.13.57-1.63.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.63.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.57 1.63-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>' +
-                        '<div class="ap-settings-popup" id="ap-settings"><div class="ap-settings-section"><div class="ap-settings-label">Tốc độ</div><div class="ap-speed-grid" id="ap-speed-grid"><button data-speed="0.75">0.75</button><button data-speed="1">1</button><button data-speed="1.25">1.25</button><button data-speed="1.3" class="active">1.3</button><button data-speed="1.5">1.5</button><button data-speed="2">2</button></div></div>' +
+                        '<div class="ap-settings-popup" id="ap-settings"><div class="ap-settings-section"><div class="ap-settings-label">Tốc độ</div><div class="ap-speed-grid" id="ap-speed-grid"><button data-speed="0.75">0.75</button><button data-speed="1">1</button><button data-speed="1.25">1.25</button><button data-speed="1.5">1.5</button><button data-speed="2">2</button></div></div>' +
                         '<div class="ap-settings-section"><div class="ap-settings-label">Hẹn giờ tắt</div><div class="ap-sleep-grid" id="ap-sleep-grid"><button data-minutes="15">15p</button><button data-minutes="30">30p</button><button data-minutes="60">60p</button></div><div class="ap-sleep-custom"><input type="number" placeholder="Phút..." id="ap-sleep-input" min="1" max="480" /><button id="ap-sleep-set">Đặt</button></div><button id="ap-sleep-off" class="ap-sleep-off-btn">Tắt hẹn giờ</button></div></div>' +
                         '</div></div></div></div></div>'
                     );
@@ -596,9 +618,22 @@ jQuery(function($) {
             }
         });
 
-        // Backward 10s / Forward 30s
+        // Backward 10s / Forward 10s
         $('#ap-backward-step').off('click').on('click', function(){ audio.currentTime = Math.max(0, audio.currentTime - 10); });
-        $('#ap-forward-step').off('click').on('click', function(){ audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 30); });
+        $('#ap-forward-step').off('click').on('click', function(){ audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10); });
+
+        // Prev/Next chapter
+        $('#ap-prev-chapter, #ap-next-chapter').off('click').on('click', function(){
+            var cid = $(this).data('chapter-id');
+            if (cid) {
+                var $item = $('.chapter-item[data-chapter-id="' + cid + '"] a');
+                if ($item.length) $item.trigger('click');
+            }
+        });
+
+        // Shuffle/Repeat toggle
+        $('#ap-shuffle').off('click').on('click', function(){ $(this).toggleClass('active'); ta_toast($(this).hasClass('active') ? 'Bật phát ngẫu nhiên' : 'Tắt phát ngẫu nhiên', 'info'); });
+        $('#ap-repeat').off('click').on('click', function(){ $(this).toggleClass('active'); ta_toast($(this).hasClass('active') ? 'Bật lặp lại' : 'Tắt lặp lại', 'info'); });
 
         // Speed
         $('#ap-speed-grid').off('click', 'button').on('click', 'button', function(){
